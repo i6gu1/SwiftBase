@@ -1,0 +1,295 @@
+<UserControl x:Class="SwiftBase.Views.WelcomeView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DesignHeight="800" d:DesignWidth="1280"
+             Background="{StaticResource BgBrush}">
+    <UserControl.Resources>
+        <Style x:Key="ConnectionItem" TargetType="{x:Type Border}">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="10,9" />
+            <Setter Property="Margin" Value="0,1" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{StaticResource HoverBrush}" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="WelcomeCard" TargetType="{x:Type Button}">
+            <Setter Property="Background" Value="{StaticResource Surface2Brush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="Padding" Value="18" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Button}">
+                        <Border x:Name="Card" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="10" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Left" VerticalAlignment="Top" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Card" Property="Background" Value="{StaticResource Surface3Brush}" />
+                                <Setter TargetName="Card" Property="BorderBrush" Value="{StaticResource BorderStrongBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Card" Property="Background" Value="#1A2A3D" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="296" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- ============================ Connections rail ============================ -->
+        <Border Grid.Column="0" Background="#0A111A" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,1,0">
+            <Grid Margin="0,14,0,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Grid Margin="18,8,12,14">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Border Width="26" Height="26" CornerRadius="6" Background="{StaticResource AccentSoftBrush}" BorderBrush="#4A2D18" BorderThickness="1">
+                            <TextBlock Text="⛁" Foreground="{StaticResource AccentBrush}" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="CONNECTIONS" Style="{StaticResource SectionLabel}" Margin="10,0,0,0" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <Button Style="{StaticResource IconButton}" Width="26" Height="26" HorizontalAlignment="Right"
+                            ToolTip="New connection" Click="NewConnection_Click" Content="+" FontSize="17" />
+                </Grid>
+
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="8,0,8,0">
+                    <ItemsControl ItemsSource="{Binding Connections}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Margin="0,0,0,18">
+                                    <Grid Margin="10,0,8,7">
+                                        <TextBlock Text="{Binding Name}" Style="{StaticResource SectionLabel}" />
+                                        <TextBlock Text="{Binding Items.Count}" HorizontalAlignment="Right" FontSize="10"
+                                                   Foreground="{StaticResource DimBrush}" />
+                                    </Grid>
+                                    <ItemsControl ItemsSource="{Binding Items}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Style="{StaticResource ConnectionItem}" Tag="{Binding}" MouseLeftButtonUp="Connection_Click">
+                                                    <Border.ContextMenu>
+                                                        <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                                            <MenuItem Header="Open connection" Click="OpenConnectionMenu_Click" />
+                                                            <Separator />
+                                                            <MenuItem Header="Remove connection…" Click="DeleteConnection_Click">
+                                                                <MenuItem.Style>
+                                                                    <Style TargetType="{x:Type MenuItem}" BasedOn="{StaticResource {x:Type MenuItem}}">
+                                                                        <Setter Property="Foreground" Value="{StaticResource RedBrush}" />
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding IsDemo}" Value="True">
+                                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </MenuItem.Style>
+                                                            </MenuItem>
+                                                        </ContextMenu>
+                                                    </Border.ContextMenu>
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto" />
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <Border Width="36" Height="36" CornerRadius="8" Background="{Binding BadgeColor}"
+                                                                BorderBrush="#24384C" BorderThickness="1" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding Badge}" FontSize="11" FontWeight="Bold"
+                                                                       Foreground="{Binding BadgeForeground}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                        </Border>
+                                                        <StackPanel Grid.Column="1" Margin="11,0,8,0" VerticalAlignment="Center">
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <Ellipse Width="6" Height="6" Fill="{Binding EnvironmentColor}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                                                <TextBlock Text="{Binding Name}" Foreground="{StaticResource TextBrush}" FontSize="12.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                            </StackPanel>
+                                                            <TextBlock Text="{Binding Subtitle}" Foreground="{StaticResource DimBrush}" FontSize="11"
+                                                                       Margin="12,2,0,0" TextTrimming="CharacterEllipsis" />
+                                                        </StackPanel>
+                                                        <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                                            <Border Background="#1C2B3B" CornerRadius="4" Padding="5,2"
+                                                                    Visibility="{Binding IsDemo, Converter={StaticResource BoolToVisibility}}">
+                                                                <TextBlock Text="DEMO" FontSize="8" FontWeight="Bold" Foreground="{StaticResource CyanBrush}" />
+                                                            </Border>
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <StackPanel Grid.Row="2" Margin="16,8,16,16">
+                    <Button Style="{StaticResource PrimaryButton}" Click="NewConnection_Click" Content="+  New connection" Height="36" />
+                    <TextBlock Text="Ctrl + K  switch connection" Foreground="{StaticResource DimBrush}" FontSize="10.5"
+                               HorizontalAlignment="Center" Margin="0,9,0,0" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ============================ Welcome content ============================ -->
+        <Grid Grid.Column="1">
+            <Ellipse Width="560" Height="560" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-230,-160,0" IsHitTestVisible="False">
+                <Ellipse.Fill>
+                    <RadialGradientBrush>
+                        <GradientStop Color="#243949" Offset="0" />
+                        <GradientStop Color="#00707C8F" Offset="0.55" />
+                        <GradientStop Color="#00070C13" Offset="1" />
+                    </RadialGradientBrush>
+                </Ellipse.Fill>
+            </Ellipse>
+            <Ellipse Width="420" Height="420" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="-220,0,0,-240" IsHitTestVisible="False">
+                <Ellipse.Fill>
+                    <RadialGradientBrush>
+                        <GradientStop Color="#2B2114" Offset="0" />
+                        <GradientStop Color="#0055472B" Offset="0.6" />
+                        <GradientStop Color="#00070C13" Offset="1" />
+                    </RadialGradientBrush>
+                </Ellipse.Fill>
+            </Ellipse>
+
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <Grid Margin="64,54,64,44" MaxWidth="860" HorizontalAlignment="Center">
+                    <StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center">
+                                <Border Background="{StaticResource AccentSoftBrush}" BorderBrush="#4A2D18" BorderThickness="1"
+                                        CornerRadius="5" Padding="8,3" HorizontalAlignment="Left">
+                                    <TextBlock Text="KEYBOARD-FIRST DATABASE WORKBENCH" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" />
+                                </Border>
+                                <TextBlock Margin="0,18,0,0" TextWrapping="Wrap">
+                                    <Run Text="Your data." Foreground="{StaticResource TextBrush}" FontSize="42" FontWeight="Bold" />
+                                    <LineBreak />
+                                    <Run Text="Zero drag." Foreground="{StaticResource AccentBrush}" FontSize="42" FontWeight="Bold" />
+                                </TextBlock>
+                                <TextBlock Text="SwiftBase is a dark, staged-edit workbench for SQLite, PostgreSQL and MySQL. Browse fast, filter visually, inspect JSON and commit every change in one transaction."
+                                           Foreground="{StaticResource MutedBrush}" FontSize="13.5" TextWrapping="Wrap" MaxWidth="540"
+                                           HorizontalAlignment="Left" Margin="0,14,0,0" LineHeight="21" />
+                            </StackPanel>
+                            <Grid Grid.Column="1" Width="168" Height="168" Margin="36,0,0,0">
+                                <Ellipse Width="140" Height="140" Fill="#101E2B" />
+                                <Image Source="/Assets/logo.png" Width="160" Height="160" Stretch="Uniform" />
+                            </Grid>
+                        </Grid>
+
+                        <Border Margin="0,26,0,0" Background="{StaticResource RedSoftBrush}" BorderBrush="#532A31" BorderThickness="1" CornerRadius="8" Padding="14,11"
+                                Visibility="{Binding HasConnectionError, Converter={StaticResource BoolToVisibility}}">
+                            <StackPanel>
+                                <TextBlock Text="CONNECTION FAILED" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource RedBrush}" />
+                                <TextBlock Text="{Binding ConnectionError}" Foreground="#F3B4B4" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0" />
+                            </StackPanel>
+                        </Border>
+
+                        <UniformGrid Columns="3" Margin="0,28,0,0">
+                            <Button Style="{StaticResource WelcomeCard}" Margin="0,0,10,0" Click="NewConnection_Click">
+                                <StackPanel>
+                                    <Border Width="34" Height="34" CornerRadius="8" Background="{StaticResource AccentSoftBrush}" HorizontalAlignment="Left">
+                                        <TextBlock Text="+" Foreground="{StaticResource AccentBrush}" FontSize="21" FontWeight="Light"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                    <TextBlock Text="New connection" Foreground="{StaticResource TextBrush}" FontSize="13.5" FontWeight="SemiBold" Margin="0,13,0,0" />
+                                    <TextBlock Text="SQLite, PostgreSQL or MySQL. Paste a URL to fill everything." Foreground="{StaticResource DimBrush}"
+                                               FontSize="11.5" TextWrapping="Wrap" Margin="0,5,0,0" LineHeight="17" />
+                                </StackPanel>
+                            </Button>
+                            <Button Style="{StaticResource WelcomeCard}" Margin="5,0,5,0" Click="OpenSqlite_Click">
+                                <StackPanel>
+                                    <Border Width="34" Height="34" CornerRadius="8" Background="{StaticResource CyanSoftBrush}" HorizontalAlignment="Left">
+                                        <TextBlock Text="◇" Foreground="{StaticResource CyanBrush}" FontSize="19"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                    <TextBlock Text="Open SQLite" Foreground="{StaticResource TextBrush}" FontSize="13.5" FontWeight="SemiBold" Margin="0,13,0,0" />
+                                    <TextBlock Text="Drop a .sqlite or .db file, or browse for one on disk." Foreground="{StaticResource DimBrush}"
+                                               FontSize="11.5" TextWrapping="Wrap" Margin="0,5,0,0" LineHeight="17" />
+                                </StackPanel>
+                            </Button>
+                            <Button Style="{StaticResource WelcomeCard}" Margin="10,0,0,0" Click="Demo_Click">
+                                <StackPanel>
+                                    <Border Width="34" Height="34" CornerRadius="8" Background="{StaticResource GreenSoftBrush}" HorizontalAlignment="Left">
+                                        <TextBlock Text="⚡" Foreground="{StaticResource GreenBrush}" FontSize="17"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                    <TextBlock Text="Demo workspace" Foreground="{StaticResource TextBrush}" FontSize="13.5" FontWeight="SemiBold" Margin="0,13,0,0" />
+                                    <TextBlock Text="Explore 2,000 users, staged edits and JSON inspection instantly." Foreground="{StaticResource DimBrush}"
+                                               FontSize="11.5" TextWrapping="Wrap" Margin="0,5,0,0" LineHeight="17" />
+                                </StackPanel>
+                            </Button>
+                        </UniformGrid>
+
+                        <Border Background="#0B141E" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="20,17" Margin="0,24,0,0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="1" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="1" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="SAFE STAGING" Style="{StaticResource SectionLabel}" />
+                                    <TextBlock Text="Edits stay yellow until you press Ctrl+S. One transaction, all or nothing."
+                                               Foreground="{StaticResource MutedBrush}" FontSize="11.5" TextWrapping="Wrap" Margin="0,6,14,0" LineHeight="17" />
+                                </StackPanel>
+                                <Border Grid.Column="1" Background="{StaticResource BorderBrush}" />
+                                <StackPanel Grid.Column="2" Margin="20,0">
+                                    <TextBlock Text="VIRTUALIZED GRID" Style="{StaticResource SectionLabel}" />
+                                    <TextBlock Text="Only visible rows are drawn. Paged reads of 500 keep memory flat."
+                                               Foreground="{StaticResource MutedBrush}" FontSize="11.5" TextWrapping="Wrap" Margin="0,6,14,0" LineHeight="17" />
+                                </StackPanel>
+                                <Border Grid.Column="3" Background="{StaticResource BorderBrush}" />
+                                <StackPanel Grid.Column="4" Margin="20,0,0,0">
+                                    <TextBlock Text="DPAPI VAULT" Style="{StaticResource SectionLabel}" />
+                                    <TextBlock Text="Passwords are encrypted per Windows user, never stored as plain text."
+                                               Foreground="{StaticResource MutedBrush}" FontSize="11.5" TextWrapping="Wrap" Margin="0,6,0,0" LineHeight="17" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <Grid Margin="2,24,2,0">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Ctrl + P" Style="{StaticResource MonoText}" Foreground="{StaticResource AccentBrush}" />
+                                <TextBlock Text="command palette" Foreground="{StaticResource DimBrush}" FontSize="11" Margin="7,0,22,0" />
+                                <TextBlock Text="Ctrl + T" Style="{StaticResource MonoText}" Foreground="{StaticResource AccentBrush}" />
+                                <TextBlock Text="new query" Foreground="{StaticResource DimBrush}" FontSize="11" Margin="7,0,22,0" />
+                                <TextBlock Text="Ctrl + K" Style="{StaticResource MonoText}" Foreground="{StaticResource AccentBrush}" />
+                                <TextBlock Text="switch connection" Foreground="{StaticResource DimBrush}" FontSize="11" Margin="7,0,0,0" />
+                            </StackPanel>
+                            <TextBlock Text="Drop a .sqlite / .db file anywhere to open it" Foreground="{StaticResource DimBrush}" FontSize="10.5"
+                                       HorizontalAlignment="Right" />
+                        </Grid>
+                    </StackPanel>
+                </Grid>
+            </ScrollViewer>
+        </Grid>
+
+    </Grid>
+</UserControl>

@@ -1,0 +1,47 @@
+# Build results
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+[Ll]og/
+artifacts/
+TestResults/
+
+# Visual Studio / Rider / VS Code
+.vs/
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.DotSettings.user
+
+# Build artifacts
+*.dll
+*.exe
+*.pdb
+*.cache
+*.ilk
+*.meta
+*.obj
+*.tlog
+*.zip
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+
+# Runtime / local data
+*.log
+crash.log
+connections.json
+connections.json.bak
+ssh_known_hosts.json
+queries.json
+
+# OS files
+Thumbs.db
+Desktop.ini
+.DS_Store

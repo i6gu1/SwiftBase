@@ -1,0 +1,23 @@
+﻿<Application x:Class="SwiftBase.App.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:converters="clr-namespace:SwiftBase.Converters"
+             StartupUri="MainWindow.xaml">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Themes/Dark.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <converters:InverseBooleanToVisibilityConverter x:Key="InverseBoolToVisibility" />
+            <converters:InverseBooleanConverter x:Key="InverseBool" />
+            <converters:StringEmptyToVisibilityConverter x:Key="StringEmptyToVisibility" />
+            <converters:StringNotEmptyToVisibilityConverter x:Key="StringNotEmptyToVisibility" />
+            <converters:NullToVisibilityConverter x:Key="NullToVisibility" />
+            <converters:CountZeroToVisibilityConverter x:Key="CountZeroToVisibility" />
+            <converters:CountNonZeroToVisibilityConverter x:Key="CountNonZeroToVisibility" />
+            <converters:QueryCellConverter x:Key="QueryCell" />
+            <converters:EnumEqualsConverter x:Key="EnumEquals" />
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

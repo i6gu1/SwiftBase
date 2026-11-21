@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/SwiftBase.App/SwiftBase.App.csproj" />
+    <Project Path="src/SwiftBase.Core/SwiftBase.Core.csproj" />
+  </Folder>
+</Solution>

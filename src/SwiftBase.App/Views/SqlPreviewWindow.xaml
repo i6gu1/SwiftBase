@@ -1,0 +1,79 @@
+<Window x:Class="SwiftBase.Views.SqlPreviewWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        xmlns:controls="clr-namespace:SwiftBase.Controls"
+        mc:Ignorable="d"
+        Title="SQL preview"
+        Width="860" Height="620"
+        MinWidth="560" MinHeight="380"
+        WindowStyle="None"
+        ResizeMode="CanResize"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        Background="{StaticResource BgBrush}">
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="0" ResizeBorderThickness="6" GlassFrameThickness="0" CornerRadius="0" />
+    </shell:WindowChrome.WindowChrome>
+
+    <Border BorderBrush="{StaticResource BorderStrongBrush}" BorderThickness="1">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="46" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="58" />
+            </Grid.RowDefinitions>
+
+            <Border Background="#0B131D" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1"
+                    MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                <Grid Margin="14,0,7,0">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Border Width="24" Height="24" CornerRadius="6" Background="{StaticResource AccentSoftBrush}"
+                                BorderBrush="#4A2D18" BorderThickness="1">
+                            <TextBlock Text="SQL" FontFamily="{StaticResource MonoFont}" FontSize="8" FontWeight="Bold"
+                                       Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center"
+                                       VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="SQL preview" Foreground="{StaticResource TextBrush}" FontSize="12.5"
+                                   FontWeight="SemiBold" Margin="10,0,0,0" VerticalAlignment="Center" />
+                        <TextBlock Text="· staged changes, not executed" Foreground="{StaticResource DimBrush}"
+                                   FontSize="10.5" Margin="8,0,0,0" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <Button Style="{StaticResource ChromeButton}" Content="&#xE8BB;" HorizontalAlignment="Right"
+                            Click="Close_Click" ToolTip="Close" />
+                </Grid>
+            </Border>
+
+            <Border Grid.Row="1" Padding="18,13,18,11" Background="{StaticResource SurfaceBrush}"
+                    BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
+                <StackPanel>
+                    <TextBlock Text="WHAT WILL RUN ON SAVE" Style="{StaticResource SectionLabel}" />
+                    <TextBlock Text="SwiftBase wraps these statements in a single transaction. Review them, then press Ctrl+S in the table tab to commit."
+                               Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,5,0,0" TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Row="2" Margin="16,14,16,10" Background="{StaticResource SurfaceBrush}"
+                    BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="3">
+                <controls:CodeEditor x:Name="PreviewEditor" Syntax="sql" IsReadOnly="True" />
+            </Border>
+
+            <Border Grid.Row="3" Background="#0B131D" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0"
+                    Padding="18,0">
+                <Grid>
+                    <TextBlock Text="{Binding ElementName=PreviewEditor, Path=Text.Length, StringFormat={}{0:N0} characters}"
+                               Foreground="{StaticResource DimBrush}" FontSize="10.5" VerticalAlignment="Center" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <Button Style="{StaticResource QuietButton}" Content="Copy SQL" Click="Copy_Click"
+                                Padding="15,8" Margin="0,0,8,0" />
+                        <Button Style="{StaticResource PrimaryButton}" Content="Close" Click="Close_Click"
+                                IsCancel="True" Padding="22,8" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+    </Border>
+</Window>
