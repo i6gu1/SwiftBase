@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SwiftBase — download the database workbench</title>
+  <meta name="description" content="Download SwiftBase, a keyboard-first dark database workbench for SQLite, PostgreSQL and MySQL." />
+  <meta name="theme-color" content="#0a0a0b" />
+  <link rel="icon" type="image/png" href="/favicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=Press+Start+2P&amp;display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <svg class="sprite" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="pixel-db" viewBox="0 0 16 16">
+      <rect x="2" y="2" width="12" height="12" fill="#0a0a0b"/>
+      <rect x="3" y="1" width="10" height="2" fill="#ffb066"/>
+      <rect x="2" y="3" width="12" height="2" fill="#ff8a24"/>
+      <rect x="2" y="5" width="12" height="8" fill="#ff7a1a"/>
+      <rect x="11" y="5" width="3" height="8" fill="#c44f05"/>
+      <rect x="3" y="13" width="10" height="2" fill="#ff8a24"/>
+      <rect x="4" y="4" width="2" height="7" fill="#ffc188"/>
+      <rect x="2" y="7" width="12" height="1" fill="#0a0a0b"/>
+      <rect x="2" y="11" width="12" height="1" fill="#0a0a0b"/>
+      <rect x="13" y="13" width="2" height="2" fill="#0a0a0b"/>
+    </symbol>
+    <symbol id="pixel-terminal" viewBox="0 0 16 16">
+      <rect x="1" y="2" width="14" height="12" fill="#0a0a0b"/>
+      <rect x="2" y="3" width="12" height="10" fill="#171719"/>
+      <rect x="3" y="5" width="2" height="2" fill="#ff7a1a"/>
+      <rect x="6" y="5" width="6" height="2" fill="#ffb066"/>
+      <rect x="3" y="9" width="4" height="2" fill="#ff7a1a"/>
+      <rect x="8" y="9" width="5" height="2" fill="#4b4b52"/>
+      <rect x="13" y="8" width="2" height="3" fill="#ff7a1a"/>
+    </symbol>
+    <symbol id="pixel-key" viewBox="0 0 16 16">
+      <rect x="2" y="8" width="6" height="6" fill="#0a0a0b"/>
+      <rect x="3" y="9" width="4" height="4" fill="#ff7a1a"/>
+      <rect x="7" y="3" width="6" height="6" fill="#0a0a0b"/>
+      <rect x="8" y="4" width="4" height="4" fill="#ffb066"/>
+      <rect x="10" y="6" width="2" height="2" fill="#0a0a0b"/>
+      <rect x="6" y="8" width="2" height="2" fill="#ff7a1a"/>
+    </symbol>
+    <symbol id="pixel-shield" viewBox="0 0 16 16">
+      <rect x="4" y="1" width="8" height="2" fill="#ffb066"/>
+      <rect x="2" y="3" width="12" height="7" fill="#ff7a1a"/>
+      <rect x="3" y="10" width="10" height="2" fill="#c44f05"/>
+      <rect x="5" y="12" width="6" height="2" fill="#c44f05"/>
+      <rect x="7" y="14" width="2" height="2" fill="#c44f05"/>
+      <rect x="7" y="5" width="2" height="5" fill="#0a0a0b"/>
+    </symbol>
+    <symbol id="pixel-cloud" viewBox="0 0 16 16">
+      <rect x="4" y="2" width="8" height="2" fill="#ffb066"/>
+      <rect x="2" y="4" width="12" height="6" fill="#ff7a1a"/>
+      <rect x="4" y="10" width="9" height="3" fill="#c44f05"/>
+      <rect x="5" y="5" width="6" height="2" fill="#0a0a0b"/>
+      <rect x="7" y="8" width="6" height="2" fill="#0a0a0b"/>
+    </symbol>
+    <symbol id="pixel-grid" viewBox="0 0 16 16">
+      <rect x="1" y="1" width="14" height="14" fill="#0a0a0b"/>
+      <rect x="2" y="2" width="12" height="2" fill="#ff7a1a"/>
+      <rect x="2" y="5" width="12" height="1" fill="#4b4b52"/>
+      <rect x="2" y="8" width="12" height="1" fill="#4b4b52"/>
+      <rect x="2" y="11" width="12" height="1" fill="#4b4b52"/>
+      <rect x="5" y="2" width="1" height="12" fill="#4b4b52"/>
+      <rect x="9" y="2" width="1" height="12" fill="#4b4b52"/>
+      <rect x="2" y="14" width="12" height="1" fill="#ffb066"/>
+    </symbol>
+  </svg>
+
+  <div class="pixel-grid-bg" aria-hidden="true"></div>
+
+  <div class="window-bar">
+    <div class="traffic" aria-hidden="true"><span></span><span></span><span></span></div>
+    <div class="window-title">swiftbase://download</div>
+    <div class="window-meta">v1.0.0 &nbsp;·&nbsp; win-x64</div>
+  </div>
+
+  <header class="topbar">
+    <a class="brand" href="#top" aria-label="SwiftBase home">
+      <svg class="pixel-icon brand-mark"><use href="#pixel-db" /></svg>
+      <span>SwiftBase</span>
+    </a>
+    <nav aria-label="Primary">
+      <a href="#features">Features</a>
+      <a href="#download">Download</a>
+      <a href="https://github.com/i6gu1/SwiftBase" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">// DATABASE WORKBENCH</p>
+        <h1>Swift<span>Base</span></h1>
+        <p class="lede">A keyboard-first, dark-mode workbench for SQLite, PostgreSQL and MySQL. Browse fast, filter visually, stage edits and ship them in one transaction.</p>
+
+        <div class="hero-actions">
+          <a class="btn primary" href="/downloads/SwiftBase-Setup.exe" download data-download>
+            <svg class="pixel-icon"><use href="#pixel-db" /></svg>
+            Download installer
+          </a>
+          <a class="btn ghost" href="#features">See features</a>
+        </div>
+
+        <ul class="chips" aria-label="Release information">
+          <li>Windows 10/11</li>
+          <li>Self-contained</li>
+          <li>No .NET setup</li>
+          <li>67 MB</li>
+        </ul>
+      </div>
+
+      <div class="app-frame" aria-label="SwiftBase interface preview">
+        <div class="app-frame-bar">
+          <span class="app-tab active">public.users</span>
+          <span class="app-tab">Query 1</span>
+          <span class="app-frame-dots" aria-hidden="true">•••</span>
+        </div>
+        <div class="app-frame-body">
+          <div class="app-sidebar">
+            <span class="side-title">DATABASE</span>
+            <span class="side-item">▦ users</span>
+            <span class="side-item">▦ orders</span>
+            <span class="side-item">◫ active_users</span>
+            <span class="side-item dim">ƒ count_users</span>
+          </div>
+          <div class="app-content">
+            <img src="/preview.png" alt="SwiftBase data grid showing staged rows" />
+            <div class="app-overlay" aria-hidden="true">
+              <span class="cursor-block"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="ticker" aria-hidden="true">
+      <span>LAZY 500-ROW READS</span><b>◆</b><span>STAGED EDITS</span><b>◆</b><span>SQL CONSOLE</span><b>◆</b><span>SSH TUNNELS</span><b>◆</b><span>DPAPI VAULT</span><b>◆</b><span>COMMAND PALETTE</span><b>◆</b>
+    </div>
+
+    <section class="section" id="features">
+      <div class="section-head">
+        <p class="eyebrow">// BUILT FOR SPEED</p>
+        <h2>Everything stays local. Nothing loads twice.</h2>
+        <p>SwiftBase keeps the UI responsive with virtualized grids, cancellable queries and 500-row pages — then commits your staged changes in a single transaction.</p>
+      </div>
+
+      <div class="feature-grid">
+        <article class="feature-card">
+          <svg class="pixel-icon feature-icon"><use href="#pixel-grid" /></svg>
+          <h3>Virtualized grid</h3>
+          <p>Filter, sort and page through large tables without freezing the UI.</p>
+          <span class="card-tag">500 rows / page</span>
+        </article>
+        <article class="feature-card">
+          <svg class="pixel-icon feature-icon"><use href="#pixel-key" /></svg>
+          <h3>Keyboard-first</h3>
+          <p>Palette, switcher, inspector and query execution are all one shortcut away.</p>
+          <span class="card-tag">Ctrl+P · Ctrl+K</span>
+        </article>
+        <article class="feature-card">
+          <svg class="pixel-icon feature-icon"><use href="#pixel-terminal" /></svg>
+          <h3>SQL console</h3>
+          <p>Run selections, cancel long statements and export results as CSV, JSON or INSERT.</p>
+          <span class="card-tag">Ctrl+Enter</span>
+        </article>
+        <article class="feature-card">
+          <svg class="pixel-icon feature-icon"><use href="#pixel-shield" /></svg>
+          <h3>Secrets, locked down</h3>
+          <p>DPAPI-encrypted credentials, TLS-required servers and fail-closed SSH host keys.</p>
+          <span class="card-tag">local vault</span>
+        </article>
+        <article class="feature-card">
+          <svg class="pixel-icon feature-icon"><use href="#pixel-cloud" /></svg>
+          <h3>Any database</h3>
+          <p>Connect to SQLite files, PostgreSQL or MySQL — directly or through an SSH tunnel.</p>
+          <span class="card-tag">3 providers</span>
+        </article>
+        <article class="feature-card">
+          <svg class="pixel-icon feature-icon"><use href="#pixel-db" /></svg>
+          <h3>Staged edits</h3>
+          <p>See changed cells in color, preview the SQL, then save everything transactionally.</p>
+          <span class="card-tag">Ctrl+S</span>
+        </article>
+      </div>
+    </section>
+
+    <section class="section download-section" id="download">
+      <div class="download-card">
+        <div class="download-copy">
+          <p class="eyebrow">// LATEST RELEASE</p>
+          <h2>Get SwiftBase v1.0.0</h2>
+          <p>One installer, everything included. The self-contained Windows x64 build needs no separate .NET runtime.</p>
+          <a class="btn primary large" href="/downloads/SwiftBase-Setup.exe" download data-download>
+            <svg class="pixel-icon"><use href="#pixel-db" /></svg>
+            Download SwiftBase-Setup.exe
+          </a>
+          <p class="download-note">Windows 10/11 · x64 · 70,260,307 bytes</p>
+        </div>
+
+        <div class="checksum-box">
+          <div class="checksum-head">
+            <span>SHA256</span>
+            <button type="button" id="copy-sha" class="copy-btn">copy</button>
+          </div>
+          <code id="sha">7F14B635FD93041E6D9C1C6A142CDE93D7E9621F5B6CEFD4596DE913A7417CAA</code>
+          <div class="checksum-foot">
+            <span class="status-dot"></span> Verified build artifact
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-left">
+      <svg class="pixel-icon footer-mark"><use href="#pixel-db" /></svg>
+      <span>made by the l house 2026</span>
+    </div>
+    <a class="social" href="https://instagram.com/emxomol" target="_blank" rel="noreferrer">
+      instagram <strong>@emxomol</strong> <span aria-hidden="true">↗</span>
+    </a>
+  </footer>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="/app.js" defer></script>
+</body>
+</html>

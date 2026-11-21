@@ -5,6 +5,9 @@
 [Ll]og/
 artifacts/
 TestResults/
+dist/
+node_modules/
+.env*
 
 # Visual Studio / Rider / VS Code
 .vs/
@@ -45,3 +48,5 @@ queries.json
 Thumbs.db
 Desktop.ini
 .DS_Store
+
+.vercel
