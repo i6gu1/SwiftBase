@@ -241,10 +241,13 @@ VALUES ('typed ''blob'' test', '\x0001FEFF41'::bytea, '2026-11-23T12:34:56.00000
 
 ## 8. النشر والتسليم
 
-- **GitHub:** دُفع الإصدار إلى `main` في المستودع `i6gu1/SwiftBase`.
+- **GitHub:** دُفع الإصدار إلى `main` في المستودع `i6gu1/SwiftBase` (الالتزام `00e334c`).
 - **الموقع:** أُعيد النشر من مجلد `web` عبر Vercel CLI باستخدام `vercel --prod --yes` على المشروع `i6gu1s-projects/swiftbase-download`.
+- **معرّف النشر:** `dpl_FX3RLepL2y7am3NTQNJZDDdgrmvB` — الحالة `READY`.
 - **رابط الموقع:** `https://swiftbase-download.vercel.app`
 - **رابط التحميل:** `https://swiftbase-download.vercel.app/downloads/SwiftBase-Setup.exe`
+- **التحقق بعد النشر:** الصفحة المنشورة تعرض `v1.1.0` و`70,264,063 bytes` وتجزئة SHA256 الصحيحة؛ وHEAD لملف التحميل أعاد `HTTP/1.1 200 OK` مع `Content-Length: 70264063`.
+- **نظافة البيانات الحساسة:** أُنشئ سر تجاوز مؤقت تلقائيًا للتحقق من النشر المحمي، ثم **تم إلغاؤه فورًا**؛ إعدادات المشروع تعود إلى حالتها الأصلية دون أي bypass.
 - **الهوية البصرية:** لم يتغير التصميم؛ لوحة داكنة، بكسل آرت، لمسات برتقالية، التذييل `made by the l house 2026`، ورابط Instagram `@emxomol`.
 
 ---
