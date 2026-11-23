@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 
 namespace SwiftBase.Core.Security;
@@ -11,95 +13,133 @@ public enum SshHostKeyVerification
 }
 
 /// <summary>
-/// Persists SSH host-key fingerprints using trust-on-first-use. Once a key is
-/// stored for a host:port, a different key fails closed.
+/// Persists SSH host-key fingerprints. Verification and first-use trust are one
+/// atomic operation guarded by a process-wide lock and a named mutex, so two
+/// connections or two app instances cannot both "win" the first connection.
+/// A key is never trusted unless the caller explicitly allows first use.
 /// </summary>
 public sealed class SshHostKeyStore
 {
-    private readonly object _sync = new();
+    private static readonly object GatesLock = new();
+    private static readonly Dictionary<string, object> Gates = new(StringComparer.OrdinalIgnoreCase);
+
     private readonly string _path;
-    private bool _loadFailed;
+    private readonly object _gate;
 
     public SshHostKeyStore(string? path = null)
     {
-        _path = path ?? Path.Combine(AppPaths.DataDirectory, "ssh_known_hosts.json");
+        _path = Path.GetFullPath(path ?? Path.Combine(AppPaths.DataDirectory, "ssh_known_hosts.json"));
+        lock (GatesLock)
+        {
+            if (!Gates.TryGetValue(_path, out var gate))
+            {
+                gate = new object();
+                Gates[_path] = gate;
+            }
+
+            _gate = gate;
+        }
     }
 
     public string FilePath => _path;
 
-    public SshHostKeyVerification Verify(string host, int port, string fingerprint)
-    {
-        if (string.IsNullOrWhiteSpace(fingerprint))
-        {
-            return SshHostKeyVerification.Mismatch;
-        }
-
-        lock (_sync)
-        {
-            var keys = LoadKeys();
-            if (_loadFailed)
-            {
-                return SshHostKeyVerification.LoadFailed;
-            }
-
-            if (!keys.TryGetValue(Key(host, port), out var stored) || stored.Count == 0)
-            {
-                return SshHostKeyVerification.Unknown;
-            }
-
-            return stored.Any(value => string.Equals(value, fingerprint, StringComparison.OrdinalIgnoreCase))
-                ? SshHostKeyVerification.Trusted
-                : SshHostKeyVerification.Mismatch;
-        }
-    }
+    /// <summary>Read-only check. Unknown keys are never trusted implicitly.</summary>
+    public SshHostKeyVerification Verify(string host, int port, string fingerprint) =>
+        VerifyOrTrust(host, port, fingerprint, allowFirstUse: false, out _);
 
     public bool IsKnown(string host, int port, string fingerprint) =>
         Verify(host, port, fingerprint) == SshHostKeyVerification.Trusted;
 
-    /// <summary>Stores a first-use key. Never updates an existing, different key.</summary>
-    public void Trust(string host, int port, string fingerprint)
+    /// <summary>
+    /// Verifies the fingerprint and, only when explicitly permitted, stores a new
+    /// one. Returns a human-readable reason for every rejection.
+    /// </summary>
+    public SshHostKeyVerification VerifyOrTrust(
+        string host,
+        int port,
+        string fingerprint,
+        bool allowFirstUse,
+        out string? failure)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(fingerprint);
-
-        lock (_sync)
+        failure = null;
+        if (string.IsNullOrWhiteSpace(fingerprint))
         {
-            var keys = LoadKeys();
-            if (_loadFailed)
+            failure = "The SSH server did not provide a host-key fingerprint.";
+            return SshHostKeyVerification.Mismatch;
+        }
+
+        var mutexName = "Local\\SwiftBase.SshHostKeys." +
+            Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(_path)));
+        using var mutex = new Mutex(false, mutexName);
+        var acquired = false;
+        try
+        {
+            try
             {
-                throw new InvalidOperationException(
-                    "The SSH known-hosts file could not be read. Refusing to overwrite it.");
+                mutex.WaitOne();
+            }
+            catch (AbandonedMutexException)
+            {
+                // The previous owner died; this instance now owns the mutex.
             }
 
-            var key = Key(host, port);
-            if (!keys.TryGetValue(key, out var stored))
+            acquired = true;
+            lock (_gate)
             {
-                stored = new List<string>();
-                keys[key] = stored;
-            }
+                var keys = LoadKeys(out var loadFailed);
+                if (loadFailed)
+                {
+                    failure = "The SSH known-hosts file could not be read. Refusing to connect.";
+                    return SshHostKeyVerification.LoadFailed;
+                }
 
-            if (stored.Any(value => string.Equals(value, fingerprint, StringComparison.OrdinalIgnoreCase)))
+                var key = Key(host, port);
+                if (!keys.TryGetValue(key, out var stored) || stored.Count == 0)
+                {
+                    if (!allowFirstUse)
+                    {
+                        failure =
+                            $"Unknown SSH host key for {host}:{port} ({fingerprint}). " +
+                            "Verify the fingerprint out of band, then enable 'Trust this host key on first use' for this connection.";
+                        return SshHostKeyVerification.Unknown;
+                    }
+
+                    keys[key] = new List<string> { fingerprint };
+                    SaveKeys(keys);
+                    return SshHostKeyVerification.Trusted;
+                }
+
+                if (stored.Any(value => string.Equals(value, fingerprint, StringComparison.OrdinalIgnoreCase)))
+                {
+                    return SshHostKeyVerification.Trusted;
+                }
+
+                failure =
+                    $"SSH host key changed for {host}:{port}. Expected {stored[0]}, received {fingerprint}. " +
+                    "Refusing to connect.";
+                return SshHostKeyVerification.Mismatch;
+            }
+        }
+        finally
+        {
+            if (acquired)
             {
-                return;
+                mutex.ReleaseMutex();
             }
-
-            if (stored.Count > 0)
-            {
-                throw new InvalidOperationException(
-                    "The SSH host key changed. Refusing to replace the stored fingerprint.");
-            }
-
-            stored.Add(fingerprint);
-            SaveKeys(keys);
         }
     }
 
-    private Dictionary<string, List<string>> LoadKeys()
+    /// <summary>Explicitly stores a first-use key. Never replaces a different key.</summary>
+    public SshHostKeyVerification Trust(string host, int port, string fingerprint) =>
+        VerifyOrTrust(host, port, fingerprint, allowFirstUse: true, out _);
+
+    private Dictionary<string, List<string>> LoadKeys(out bool loadFailed)
     {
-        _loadFailed = false;
-        var empty = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        loadFailed = false;
+        var keys = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
         if (!File.Exists(_path))
         {
-            return empty;
+            return keys;
         }
 
         try
@@ -107,8 +147,8 @@ public sealed class SshHostKeyStore
             using var document = JsonDocument.Parse(File.ReadAllText(_path));
             if (document.RootElement.ValueKind != JsonValueKind.Object)
             {
-                _loadFailed = true;
-                return empty;
+                loadFailed = true;
+                return keys;
             }
 
             foreach (var property in document.RootElement.EnumerateObject())
@@ -137,16 +177,16 @@ public sealed class SshHostKeyStore
 
                 if (fingerprints.Count > 0)
                 {
-                    empty[property.Name] = fingerprints;
+                    keys[KeyFromStored(property.Name)] = fingerprints;
                 }
             }
 
-            return empty;
+            return keys;
         }
         catch
         {
-            _loadFailed = true;
-            return empty;
+            loadFailed = true;
+            return keys;
         }
     }
 
@@ -177,6 +217,9 @@ public sealed class SshHostKeyStore
             }
         }
     }
+
+    // Stored keys are already canonical "host:port" values.
+    private static string KeyFromStored(string key) => key;
 
     private static string Key(string host, int port) =>
         $"{host.Trim().ToLowerInvariant()}:{port}";

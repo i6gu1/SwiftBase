@@ -17,10 +17,8 @@ public sealed class TableTabViewModel : TabViewModel
     public const int DefaultPageSize = 500;
 
     private readonly DbTable _table;
-    private readonly DatabaseSession? _session;
-    private readonly List<RowViewModel> _demoRows = new();
+    private readonly DatabaseSession _session;
     private readonly HashSet<RowViewModel> _trackedRows = new();
-    private readonly Random _random = new(17);
 
     private CancellationTokenSource? _loadCts;
 
@@ -61,7 +59,7 @@ public sealed class TableTabViewModel : TabViewModel
 
     public TableTabViewModel(
         DbTable table,
-        DatabaseSession? session,
+        DatabaseSession session,
         string database,
         Action<TabViewModel> close)
         : base(close, table.Name, table.Glyph, $"{table.Schema}.{table.Name}")
@@ -96,33 +94,18 @@ public sealed class TableTabViewModel : TabViewModel
         SetInspectorNullCommand = new RelayCommand(SetInspectorNull, () => IsInspectorOpen && CanEdit);
         RevertInspectorCommand = new RelayCommand(RevertInspector, () => IsInspectorOpen);
 
-        if (!_table.IsLive)
-        {
-            _demoRows.AddRange(table.Rows);
-            foreach (var row in _demoRows)
-            {
-                Track(row);
-            }
-
-            RebuildDemoPage();
-            LastQueryMs = 6 + _random.Next(0, 9);
-        }
-        else
-        {
-            _ = LoadPageAsync();
-        }
+        _ = LoadPageAsync();
     }
 
     public string Database { get; }
     public DbTable Table => _table;
     public IReadOnlyList<DbColumn> Columns { get; }
     public ObservableCollection<RowViewModel> Rows { get; } = new();
-    public bool IsLive => _table.IsLive;
     public bool CanEdit { get; }
     public string ReadOnlyReason { get; }
     public bool IsReadOnly => !CanEdit;
     public bool HasNoPrimaryKey => CanEdit && !_table.HasPrimaryKey;
-    public string SelectionKindLabel => IsLive ? "library data" : "demo data";
+    public string SelectionKindLabel => "database data";
 
     public bool IsLoading
     {
@@ -435,7 +418,7 @@ public sealed class TableTabViewModel : TabViewModel
             return;
         }
 
-        if (IsLive && HasPendingChanges)
+        if (HasPendingChanges)
         {
             SetStatus("Save or discard pending changes before sorting.", true);
             return;
@@ -452,20 +435,12 @@ public sealed class TableTabViewModel : TabViewModel
         }
 
         PageIndex = 0;
-        if (IsLive)
-        {
-            _ = LoadPageAsync();
-        }
-        else
-        {
-            RebuildDemoPage();
-            SetStatus($"{columnName} {(SortDescending ? "descending" : "ascending")}");
-        }
+        _ = LoadPageAsync();
     }
 
     private async Task ApplyFilterAsync()
     {
-        if (IsLive && HasPendingChanges)
+        if (HasPendingChanges)
         {
             SetStatus("Save or discard pending changes before filtering.", true);
             return;
@@ -485,21 +460,12 @@ public sealed class TableTabViewModel : TabViewModel
         IsFilterOpen = false;
         PageIndex = 0;
 
-        if (IsLive)
-        {
-            await LoadPageAsync();
-        }
-        else
-        {
-            RebuildDemoPage();
-            LastQueryMs = 4 + _random.Next(0, 16);
-            SetStatus($"Filter applied · {TotalRows:N0} matching rows");
-        }
+        await LoadPageAsync();
     }
 
     private async Task ClearFilterAsync()
     {
-        if (IsLive && HasPendingChanges)
+        if (HasPendingChanges)
         {
             SetStatus("Save or discard pending changes before clearing the filter.", true);
             return;
@@ -511,16 +477,7 @@ public sealed class TableTabViewModel : TabViewModel
         IsFilterOpen = false;
         PageIndex = 0;
 
-        if (IsLive)
-        {
-            await LoadPageAsync();
-        }
-        else
-        {
-            RebuildDemoPage();
-            LastQueryMs = 4 + _random.Next(0, 10);
-            SetStatus("Filter cleared");
-        }
+        await LoadPageAsync();
     }
 
     private async Task AddRowAsync()
@@ -530,7 +487,7 @@ public sealed class TableTabViewModel : TabViewModel
             return;
         }
 
-        if (IsLive && HasPendingChanges && IsFilterActive)
+        if (HasPendingChanges && IsFilterActive)
         {
             SetStatus("Save or discard pending changes before adding a row to a filtered page.", true);
             return;
@@ -541,28 +498,30 @@ public sealed class TableTabViewModel : TabViewModel
             await ClearFilterAsync();
         }
 
-        var values = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        var values = new Dictionary<string, CellData>(StringComparer.OrdinalIgnoreCase);
         foreach (var column in Columns)
         {
-            string? value;
+            string? display;
             if (column.IsPrimaryKey)
             {
-                value = IsLive ? "" : "new_" + Guid.NewGuid().ToString("N")[..8];
+                // Empty typed PK is skipped by the provider so the database can
+                // generate it; the user can still type an explicit value.
+                display = "";
             }
             else if (!string.IsNullOrWhiteSpace(column.DefaultValue) && !column.DefaultValue.Contains('('))
             {
-                value = column.DefaultValue.Trim().Trim('\'');
+                display = column.DefaultValue.Trim().Trim('\'');
             }
             else if (column.IsNullable)
             {
-                value = null;
+                display = null;
             }
             else
             {
-                value = "";
+                display = "";
             }
 
-            values[column.Name] = value;
+            values[column.Name] = new CellData(display, display);
         }
 
         var row = new RowViewModel(values);
@@ -571,19 +530,9 @@ public sealed class TableTabViewModel : TabViewModel
         SelectedRow = row;
         IsStructure = false;
 
-        if (IsLive)
-        {
-            Rows.Add(row);
-            TotalRows++;
-            UpdatePageLabels();
-        }
-        else
-        {
-            _demoRows.Add(row);
-            Rows.Add(row);
-            TotalRows++;
-            UpdatePageLabels();
-        }
+        Rows.Add(row);
+        TotalRows++;
+        UpdatePageLabels();
 
         RefreshCounters();
         SetStatus("New row staged · press Ctrl+S to save");
@@ -600,7 +549,6 @@ public sealed class TableTabViewModel : TabViewModel
         if (row.IsNew)
         {
             Rows.Remove(row);
-            _demoRows.Remove(row);
             Untrack(row);
             SelectedRow = null;
             TotalRows = Math.Max(0, TotalRows - 1);
@@ -620,32 +568,6 @@ public sealed class TableTabViewModel : TabViewModel
         var changedRows = _trackedRows.Where(r => r.HasChanges).ToList();
         if (changedRows.Count == 0)
         {
-            return;
-        }
-
-        if (!IsLive)
-        {
-            var deleted = changedRows.Where(r => r.IsDeleted).ToList();
-            foreach (var row in deleted)
-            {
-                _demoRows.Remove(row);
-                Untrack(row);
-            }
-
-            foreach (var row in changedRows.Where(r => !r.IsDeleted))
-            {
-                row.CommitAll();
-            }
-
-            RebuildDemoPage();
-            LastQueryMs = 8 + _random.Next(0, 12);
-            SetStatus($"Saved {changedRows.Count} change{(changedRows.Count == 1 ? "" : "s")} · demo session");
-            return;
-        }
-
-        if (_session is null)
-        {
-            SetStatus("No active database session.", true);
             return;
         }
 
@@ -676,17 +598,7 @@ public sealed class TableTabViewModel : TabViewModel
         }
 
         var set = BuildChangeSet(changedRows);
-        IReadOnlyList<string> scripts;
-        if (IsLive && _session is not null)
-        {
-            scripts = _session.Provider.BuildChangeScripts(set);
-        }
-        else
-        {
-            var provider = new SqliteProvider(new ConnectionConfig { Database = "demo" });
-            scripts = provider.BuildChangeScripts(set);
-        }
-
+        var scripts = _session.Provider.BuildChangeScripts(set);
         PreviewRequested?.Invoke(string.Join(Environment.NewLine, scripts));
     }
 
@@ -698,43 +610,12 @@ public sealed class TableTabViewModel : TabViewModel
             return;
         }
 
-        if (IsLive)
-        {
-            await LoadPageAsync();
-        }
-        else
-        {
-            RebuildDemoPage();
-            LastQueryMs = 5 + _random.Next(0, 9);
-        }
-
+        await LoadPageAsync();
         SetStatus("Refreshed");
     }
 
     private async Task DiscardPendingAsync()
     {
-        if (!IsLive)
-        {
-            var staged = _trackedRows.Where(r => r.HasChanges).ToList();
-            foreach (var row in staged)
-            {
-                if (row.IsNew)
-                {
-                    Rows.Remove(row);
-                    _demoRows.Remove(row);
-                    Untrack(row);
-                }
-                else
-                {
-                    row.RevertAll();
-                }
-            }
-
-            RebuildDemoPage();
-            SetStatus("Pending changes discarded");
-            return;
-        }
-
         await LoadPageAsync();
         SetStatus("Pending changes discarded");
     }
@@ -753,14 +634,7 @@ public sealed class TableTabViewModel : TabViewModel
         }
 
         PageIndex++;
-        if (IsLive)
-        {
-            await LoadPageAsync();
-        }
-        else
-        {
-            RebuildDemoPage();
-        }
+        await LoadPageAsync();
     }
 
     private async Task PreviousPageAsync()
@@ -777,14 +651,7 @@ public sealed class TableTabViewModel : TabViewModel
         }
 
         PageIndex--;
-        if (IsLive)
-        {
-            await LoadPageAsync();
-        }
-        else
-        {
-            RebuildDemoPage();
-        }
+        await LoadPageAsync();
     }
 
     private void CloseInspector() => IsInspectorOpen = false;
@@ -866,11 +733,6 @@ public sealed class TableTabViewModel : TabViewModel
 
     private async Task LoadPageAsync()
     {
-        if (!IsLive || _session is null)
-        {
-            return;
-        }
-
         _loadCts?.Cancel();
         _loadCts?.Dispose();
         _loadCts = new CancellationTokenSource();
@@ -938,43 +800,6 @@ public sealed class TableTabViewModel : TabViewModel
         }
     }
 
-    private void RebuildDemoPage()
-    {
-        IEnumerable<RowViewModel> query = _demoRows;
-        if (IsFilterActive)
-        {
-            query = query.Where(MatchesFilter);
-        }
-
-        if (!string.IsNullOrWhiteSpace(SortColumn))
-        {
-            string Key(RowViewModel row) =>
-                row.Cells.TryGetValue(SortColumn!, out var cell) ? (cell.IsNull ? "" : cell.Value) : "";
-
-            query = SortDescending
-                ? query.OrderByDescending(Key, StringComparer.CurrentCultureIgnoreCase)
-                : query.OrderBy(Key, StringComparer.CurrentCultureIgnoreCase);
-        }
-
-        var filtered = query.ToList();
-        TotalRows = filtered.Count;
-        PageCount = Math.Max(1, (int)Math.Ceiling(TotalRows / (double)DefaultPageSize));
-        if (PageIndex >= PageCount)
-        {
-            PageIndex = PageCount - 1;
-        }
-
-        var start = PageIndex * DefaultPageSize;
-        Rows.Clear();
-        foreach (var row in filtered.Skip(start).Take(DefaultPageSize))
-        {
-            Rows.Add(row);
-        }
-
-        UpdatePageLabels();
-        RefreshCounters();
-    }
-
     private bool UpdatePageLabels()
     {
         PageCount = Math.Max(1, (int)Math.Ceiling(TotalRows / (double)DefaultPageSize));
@@ -1017,30 +842,6 @@ public sealed class TableTabViewModel : TabViewModel
     {
         StatusMessage = message;
         IsStatusError = isError;
-    }
-
-    private bool MatchesFilter(RowViewModel row)
-    {
-        if (!IsFilterActive)
-        {
-            return true;
-        }
-
-        if (!row.Cells.TryGetValue(FilterColumn, out var cell))
-        {
-            return true;
-        }
-
-        var text = cell.IsNull ? "" : cell.Value;
-        var value = FilterValue.Trim();
-        return FilterOperator switch
-        {
-            "equals" => string.Equals(text, value, StringComparison.CurrentCultureIgnoreCase),
-            "starts with" => text.StartsWith(value, StringComparison.CurrentCultureIgnoreCase),
-            "is empty" => string.IsNullOrWhiteSpace(text),
-            "is not empty" => !string.IsNullOrWhiteSpace(text),
-            _ => text.Contains(value, StringComparison.CurrentCultureIgnoreCase),
-        };
     }
 
     private FilterSpec? BuildFilterSpec()
@@ -1112,10 +913,12 @@ public sealed class TableTabViewModel : TabViewModel
 
     private RowViewModel BuildRow(object?[] values)
     {
-        var dict = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        var dict = new Dictionary<string, CellData>(StringComparer.OrdinalIgnoreCase);
         for (var i = 0; i < Columns.Count; i++)
         {
-            dict[Columns[i].Name] = i < values.Length ? ValueFormatter.Format(values[i]) : null;
+            var raw = i < values.Length ? values[i] : null;
+            var typed = raw is DBNull ? null : raw;
+            dict[Columns[i].Name] = new CellData(ValueFormatter.Format(typed), typed);
         }
 
         var row = new RowViewModel(dict);

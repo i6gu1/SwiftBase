@@ -3,6 +3,9 @@ using SwiftBase.ViewModels;
 
 namespace SwiftBase.Models;
 
+/// <summary>Display text plus the untouched CLR value returned by the reader.</summary>
+public sealed record CellData(string? Display, object? Typed);
+
 /// <summary>A row in a table, with staging state (new / edited / marked deleted).</summary>
 public sealed class RowViewModel : ObservableObject
 {
@@ -13,11 +16,11 @@ public sealed class RowViewModel : ObservableObject
     private bool _isNew;
     private bool _isDeleted;
 
-    public RowViewModel(IEnumerable<KeyValuePair<string, string?>> values)
+    public RowViewModel(IEnumerable<KeyValuePair<string, CellData>> values)
     {
         foreach (var pair in values)
         {
-            var cell = new CellViewModel(pair.Key, pair.Value, this);
+            var cell = new CellViewModel(pair.Key, pair.Value.Display, pair.Value.Typed, this);
             Cells[pair.Key] = cell;
             OrderedCells.Add(cell);
         }
@@ -74,34 +77,34 @@ public sealed class RowViewModel : ObservableObject
 
     public bool IsDirty => Cells.Values.Any(c => c.IsDirty);
 
-    public Dictionary<string, string?> Snapshot()
+    public Dictionary<string, object?> Snapshot()
     {
-        var values = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        var values = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
         foreach (var cell in OrderedCells)
         {
-            values[cell.Column] = cell.IsNull ? null : cell.Value;
+            values[cell.Column] = cell.IsNull ? null : cell.TypedValue;
         }
 
         return values;
     }
 
-    public Dictionary<string, string?> OriginalSnapshot()
+    public Dictionary<string, object?> OriginalSnapshot()
     {
-        var values = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        var values = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
         foreach (var cell in OrderedCells)
         {
-            values[cell.Column] = cell.OriginalValue;
+            values[cell.Column] = cell.OriginalTypedValue;
         }
 
         return values;
     }
 
-    public Dictionary<string, string?> ChangedSnapshot()
+    public Dictionary<string, object?> ChangedSnapshot()
     {
-        var values = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        var values = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
         foreach (var cell in OrderedCells.Where(c => c.IsDirty))
         {
-            values[cell.Column] = cell.IsNull ? null : cell.Value;
+            values[cell.Column] = cell.IsNull ? null : cell.TypedValue;
         }
 
         return values;

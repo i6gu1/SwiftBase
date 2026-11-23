@@ -40,10 +40,11 @@ public sealed class MainViewModel : ObservableObject
     private readonly DispatcherTimer _toastTimer;
     private DatabaseSession? _session;
     private ConnectionConfig? _activeConfig;
-    private bool _isDemo;
     private int _queryCounter;
     private bool _suppressDatabaseChange;
     private CancellationTokenSource? _connectCts;
+    private CancellationTokenSource? _switchCts;
+    private long _sessionGeneration;
 
     private ConnectionProfile? _activeProfile;
     private bool _isConnected;
@@ -125,7 +126,7 @@ public sealed class MainViewModel : ObservableObject
 
     public bool WelcomeVisible => !IsConnected;
     public bool WorkspaceVisible => IsConnected;
-    public bool CanSwitchDatabase => IsConnected && !_isDemo;
+    public bool CanSwitchDatabase => IsConnected;
 
     public bool IsConnecting
     {
@@ -189,7 +190,7 @@ public sealed class MainViewModel : ObservableObject
             }
 
             OnPropertyChanged(nameof(ConnectionSubtitle));
-            if (!_suppressDatabaseChange && IsConnected && !_isDemo && value != _session?.ActiveDatabase)
+            if (!_suppressDatabaseChange && IsConnected && value != _session?.ActiveDatabase)
             {
                 if (HasPendingChanges)
                 {
@@ -304,18 +305,13 @@ public sealed class MainViewModel : ObservableObject
     public void ReloadConnections()
     {
         Connections.Clear();
-        foreach (var group in SampleData.CreateConnections())
-        {
-            Connections.Add(group);
-        }
-
         var saved = _store.Load()
             .Select(ConnectionProfile.FromConfig)
             .OrderByDescending(p => p.IsProduction)
             .ThenBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
 
-        var vaultFailed = _store.LastLoadFailed;
+        var vaultFailed = _store.LastLoadFailed || _store.LastDecryptFailed;
         if (saved.Count > 0)
         {
             Connections.Add(new ConnectionGroup
@@ -327,7 +323,9 @@ public sealed class MainViewModel : ObservableObject
 
         if (vaultFailed)
         {
-            ShowToast("Saved connections could not be read. The vault was not changed.", true);
+            ShowToast(
+                "Some saved connections or secrets could not be read. The vault was not changed; re-enter the affected credentials before saving.",
+                true);
         }
     }
 
@@ -350,18 +348,14 @@ public sealed class MainViewModel : ObservableObject
         _connectCts?.Cancel();
         _connectCts?.Dispose();
         _connectCts = new CancellationTokenSource();
+        _sessionGeneration++;
+        _switchCts?.Cancel();
         var token = _connectCts.Token;
 
         IsConnecting = true;
         ConnectionError = "";
         try
         {
-            if (profile.IsDemo)
-            {
-                await OpenDemoAsync(profile);
-                return;
-            }
-
             if (profile.Config is null)
             {
                 throw new InvalidOperationException("This connection has no saved configuration.");
@@ -424,9 +418,9 @@ public sealed class MainViewModel : ObservableObject
         await RegisterConnectionAsync(config);
     }
 
-    public void DeleteConnection(ConnectionProfile profile)
+    public async Task DeleteConnectionAsync(ConnectionProfile profile)
     {
-        if (profile.Config is null || profile.IsDemo)
+        if (profile.Config is null)
         {
             return;
         }
@@ -438,12 +432,21 @@ public sealed class MainViewModel : ObservableObject
             return;
         }
 
-        _store.Remove(profile.Config.Id);
-        ReloadConnections();
-        ShowToast("Connection removed");
+        try
+        {
+            _store.Remove(profile.Config.Id);
+            ReloadConnections();
+            ShowToast("Connection removed");
+        }
+        catch (Exception ex)
+        {
+            ShowToast("Could not remove the connection: " + ex.GetBaseException().Message, true);
+            return;
+        }
+
         if (wasActive)
         {
-            _ = DisconnectAsync();
+            await DisconnectAsync(force: true);
         }
     }
 
@@ -481,12 +484,6 @@ public sealed class MainViewModel : ObservableObject
             return;
         }
 
-        if (_isDemo)
-        {
-            RefreshDemoSchema();
-            return;
-        }
-
         if (_session is null)
         {
             return;
@@ -506,7 +503,7 @@ public sealed class MainViewModel : ObservableObject
 
     public void OpenTable(DbTable table)
     {
-        if (!IsConnected)
+        if (!IsConnected || _session is null)
         {
             return;
         }
@@ -531,12 +528,18 @@ public sealed class MainViewModel : ObservableObject
         AddTab(tab);
     }
 
-    public QueryTabViewModel NewQueryTab(string? sql = null)
+    public QueryTabViewModel? NewQueryTab(string? sql = null)
     {
         _queryCounter++;
+        if (_session is null)
+        {
+            ShowToast("Connect to a database before opening a query tab.", true);
+            return null;
+        }
+
         var tab = new QueryTabViewModel(
             _session,
-            _isDemo ? "demo" : SelectedDatabase,
+            SelectedDatabase,
             Tables.ToList(),
             _queryCounter,
             CloseTab);
@@ -669,19 +672,24 @@ public sealed class MainViewModel : ObservableObject
 
     private async Task DisposeSessionAsync()
     {
+        _sessionGeneration++;
+        _switchCts?.Cancel();
+        _switchCts?.Dispose();
+        _switchCts = null;
+
         if (_session is null)
         {
             return;
         }
 
-        await _session.DisposeAsync();
+        var session = _session;
         _session = null;
+        await session.DisposeAsync();
     }
 
     private void ResetWorkspace()
     {
         _activeConfig = null;
-        SetDemoMode(false);
         IsConnected = false;
         ActiveProfile = null;
         ConnectionError = "";
@@ -694,76 +702,6 @@ public sealed class MainViewModel : ObservableObject
         RebuildExplorerGroups();
     }
 
-    private void SetDemoMode(bool value)
-    {
-        if (_isDemo == value)
-        {
-            return;
-        }
-
-        _isDemo = value;
-        OnPropertyChanged(nameof(CanSwitchDatabase));
-    }
-
-    private void RefreshDemoSchema()
-    {
-        Tables.Clear();
-        foreach (var table in SampleData.CreateTables())
-        {
-            Tables.Add(table);
-        }
-
-        RebuildExplorerGroups();
-        OnPropertyChanged(nameof(WorkspaceStatus));
-        ShowToast($"Schema refreshed · {Tables.Count:N0} objects");
-    }
-
-    private async Task OpenDemoAsync(ConnectionProfile profile)
-    {
-        await DisposeSessionAsync();
-
-        _activeConfig = null;
-        SetDemoMode(true);
-        CloseAllTabs();
-
-        Tables.Clear();
-        foreach (var table in SampleData.CreateTables())
-        {
-            Tables.Add(table);
-        }
-
-        Databases.Clear();
-        if (profile.Engine == DbEngine.Sqlite)
-        {
-            foreach (var database in new[] { "main", "analytics", "shop" })
-            {
-                Databases.Add(database);
-            }
-        }
-        else
-        {
-            foreach (var database in new[] { "analytics", "shop", "shop_prod" })
-            {
-                Databases.Add(database);
-            }
-
-            if (!Databases.Contains(profile.Database, StringComparer.OrdinalIgnoreCase))
-            {
-                Databases.Add(profile.Database);
-            }
-        }
-
-        _suppressDatabaseChange = true;
-        SelectedDatabase = profile.Engine == DbEngine.Sqlite ? "main" : profile.Database;
-        _suppressDatabaseChange = false;
-
-        ActiveProfile = profile;
-        RebuildExplorerGroups();
-        IsConnected = true;
-        OnPropertyChanged(nameof(WorkspaceStatus));
-        ShowToast($"{profile.Name} · demo workspace loaded");
-    }
-
     private async Task OpenLiveAsync(ConnectionProfile profile, string? database, CancellationToken cancellationToken)
     {
         if (profile.Config is null)
@@ -771,7 +709,6 @@ public sealed class MainViewModel : ObservableObject
             throw new InvalidOperationException("This connection has no saved configuration.");
         }
 
-        SetDemoMode(false);
         ConnectionError = "";
 
         var newSession = await DatabaseSession.OpenAsync(profile.Config, database, cancellationToken);
@@ -839,25 +776,62 @@ public sealed class MainViewModel : ObservableObject
             return;
         }
 
+        // Cancel any earlier switch so a slow connection cannot replace a newer
+        // one, and make every later session operation invalidate this attempt.
+        _switchCts?.Cancel();
+        _switchCts?.Dispose();
+        var cts = new CancellationTokenSource();
+        _switchCts = cts;
+        var token = cts.Token;
+        var generation = ++_sessionGeneration;
         var previousDatabase = _session.ActiveDatabase;
+
+        DatabaseSession? newSession = null;
+        DatabaseSession? oldSession = null;
         try
         {
-            var newSession = await DatabaseSession.OpenAsync(_activeConfig, database);
-            var infos = await newSession.Provider.GetSchemaAsync(database);
-            var oldSession = _session;
+            // Never mutate the live config; a failed switch must leave it intact.
+            var config = _activeConfig.CloneForDatabase(database);
+            newSession = await DatabaseSession.OpenAsync(config, database, token);
+            var infos = await newSession.Provider.GetSchemaAsync(database, token);
+            if (token.IsCancellationRequested || generation != _sessionGeneration)
+            {
+                return;
+            }
+
+            oldSession = _session;
             _session = newSession;
+            newSession = null;
             _activeConfig.Database = database;
             CloseAllTabs();
             ApplySchema(infos);
-            await oldSession.DisposeAsync();
             ShowToast($"Switched to database {database}");
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            // A newer switch, connection or disconnect superseded this attempt.
         }
         catch (Exception ex)
         {
-            _suppressDatabaseChange = true;
-            SelectedDatabase = previousDatabase;
-            _suppressDatabaseChange = false;
-            ShowToast("Could not switch database: " + ex.GetBaseException().Message, true);
+            if (generation == _sessionGeneration)
+            {
+                _suppressDatabaseChange = true;
+                SelectedDatabase = previousDatabase;
+                _suppressDatabaseChange = false;
+                ShowToast("Could not switch database: " + ex.GetBaseException().Message, true);
+            }
+        }
+        finally
+        {
+            if (newSession is not null)
+            {
+                await newSession.DisposeAsync();
+            }
+
+            if (oldSession is not null)
+            {
+                await oldSession.DisposeAsync();
+            }
         }
     }
 

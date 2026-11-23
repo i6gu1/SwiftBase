@@ -4,7 +4,7 @@
 ; -----------------------------------------------------------------------------
 
 #define MyAppName "SwiftBase"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.1.0"
 #define MyAppPublisher "The L House"
 #define MyAppExeName "SwiftBase.exe"
 
@@ -48,11 +48,11 @@ OutputDir=..\artifacts\installer
 OutputBaseFilename=SwiftBase-Setup
 
 ; Setup executable metadata.
-VersionInfoVersion=1.0.0.0
+VersionInfoVersion=1.1.0.0
 VersionInfoCompany=The L House
 VersionInfoDescription=SwiftBase Setup
 VersionInfoProductName=SwiftBase
-VersionInfoProductVersion=1.0.0
+VersionInfoProductVersion=1.1.0
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"

@@ -23,4 +23,10 @@ public interface IDatabaseProvider : IAsyncDisposable
 
     /// <summary>Builds the exact SQL that <see cref="ApplyChangesAsync"/> would run, for the preview dialog.</summary>
     IReadOnlyList<string> BuildChangeScripts(TableChangeSet changeSet);
+
+    /// <summary>Engine-correct quoted identifier for export scripts.</summary>
+    string QuoteIdentifier(string identifier);
+
+    /// <summary>Engine-correct, escaped SQL literal for export scripts (never built from display strings).</summary>
+    string FormatSqlLiteral(object? value);
 }

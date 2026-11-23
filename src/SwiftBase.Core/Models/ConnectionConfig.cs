@@ -16,6 +16,12 @@ public sealed class SshConfig
     public string? PrivateKeyPath { get; set; }
     public string? Passphrase { get; set; }
 
+    /// <summary>
+    /// Explicit per-connection opt-in for a first-use SSH host key. Off by default:
+    /// unknown keys fail closed until the operator confirms the fingerprint.
+    /// </summary>
+    public bool TrustNewHostKey { get; set; }
+
     public bool IsConfigured =>
         !string.IsNullOrWhiteSpace(Host) && !string.IsNullOrWhiteSpace(Username);
 }
@@ -34,7 +40,15 @@ public sealed class ConnectionConfig
     public string Environment { get; set; } = "Local";
     public bool UseSsh { get; set; }
     public SshConfig Ssh { get; set; } = new();
-    public bool IsDemo { get; set; }
+
+    /// <summary>
+    /// Explicit opt-in for self-signed/untrusted database certificates. Off by default.
+    /// Never enabled for a new connection without a clear warning in the UI.
+    /// </summary>
+    public bool AllowUnverifiedTls { get; set; }
+
+    /// <summary>Optional PEM CA bundle used by VerifyFull / VerifyCA TLS modes.</summary>
+    public string? RootCertificatePath { get; set; }
 
     public int EffectivePort => Port > 0
         ? Port
@@ -66,7 +80,8 @@ public sealed class ConnectionConfig
             Password = Password,
             Environment = Environment,
             UseSsh = UseSsh,
-            IsDemo = IsDemo,
+            AllowUnverifiedTls = AllowUnverifiedTls,
+            RootCertificatePath = RootCertificatePath,
             Ssh = new SshConfig
             {
                 Host = Ssh.Host,
@@ -75,6 +90,7 @@ public sealed class ConnectionConfig
                 Password = Ssh.Password,
                 PrivateKeyPath = Ssh.PrivateKeyPath,
                 Passphrase = Ssh.Passphrase,
+                TrustNewHostKey = Ssh.TrustNewHostKey,
             },
         };
         return clone;

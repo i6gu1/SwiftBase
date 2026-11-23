@@ -19,17 +19,30 @@ public sealed class CellViewModel : ObservableObject
     private bool _isNull;
 
     public CellViewModel(string column, string? value, RowViewModel owner)
+        : this(column, value, typedValue: null, owner)
+    {
+    }
+
+    public CellViewModel(string column, string? value, object? typedValue, RowViewModel owner)
     {
         Column = column;
         _value = value ?? "";
         _isNull = value is null;
         OriginalValue = value;
+        OriginalTypedValue = typedValue;
+        TypedValue = typedValue;
         Owner = owner;
     }
 
     public string Column { get; }
     public RowViewModel Owner { get; }
     public string? OriginalValue { get; private set; }
+
+    /// <summary>Original CLR value from the reader. Never a truncated display string.</summary>
+    public object? OriginalTypedValue { get; private set; }
+
+    /// <summary>Current CLR value; user edits are strings, untouched cells keep their type.</summary>
+    public object? TypedValue { get; private set; }
 
     public string Value
     {
@@ -44,6 +57,7 @@ public sealed class CellViewModel : ObservableObject
 
             _value = value;
             _isNull = false;
+            TypedValue = value;
             IsDirty = !string.Equals(_value, OriginalValue, StringComparison.Ordinal);
             OnPropertyChanged();
             OnPropertyChanged(nameof(IsDirty));
@@ -81,6 +95,7 @@ public sealed class CellViewModel : ObservableObject
 
         _isNull = true;
         _value = "";
+        TypedValue = null;
         IsDirty = !(OriginalValue is null);
         OnPropertyChanged(nameof(Value));
         OnPropertyChanged(nameof(DisplayValue));
@@ -92,6 +107,7 @@ public sealed class CellViewModel : ObservableObject
     {
         _isNull = OriginalValue is null;
         _value = OriginalValue ?? "";
+        TypedValue = OriginalTypedValue;
         IsDirty = false;
         OnPropertyChanged(nameof(Value));
         OnPropertyChanged(nameof(IsDirty));
@@ -102,6 +118,7 @@ public sealed class CellViewModel : ObservableObject
     public void Commit()
     {
         OriginalValue = _isNull ? null : _value;
+        OriginalTypedValue = TypedValue;
         if (!IsDirty)
         {
             return;

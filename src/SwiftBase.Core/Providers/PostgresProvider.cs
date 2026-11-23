@@ -23,6 +23,15 @@ public sealed class PostgresProvider : DatabaseProviderBase
 
     protected override DbConnection CreateConnection()
     {
+        // Direct connections authenticate the server with VerifyFull. A tunnel is
+        // already an authenticated encrypted channel (verified SSH host key), and
+        // its loopback endpoint cannot match the database certificate hostname.
+        var viaTunnel = Config.UseSsh && Config.Engine != DatabaseEngine.Sqlite;
+        var verifyCertificate = !Config.AllowUnverifiedTls && !viaTunnel;
+        var rootCertificate = string.IsNullOrWhiteSpace(Config.RootCertificatePath)
+            ? null
+            : Config.RootCertificatePath;
+
         var builder = new NpgsqlConnectionStringBuilder
         {
             Host = string.IsNullOrWhiteSpace(Config.Host) ? "127.0.0.1" : Config.Host,
@@ -32,7 +41,11 @@ public sealed class PostgresProvider : DatabaseProviderBase
             Password = Config.Password ?? "",
             Timeout = 15,
             CommandTimeout = 120,
-            SslMode = SslMode.Require,
+            SslMode = viaTunnel
+                ? SslMode.Disable
+                : verifyCertificate ? SslMode.VerifyFull : SslMode.Require,
+            RootCertificate = verifyCertificate ? rootCertificate : null,
+            CheckCertificateRevocation = verifyCertificate,
             IncludeErrorDetail = false,
             Pooling = true,
             MinPoolSize = 0,
@@ -41,6 +54,10 @@ public sealed class PostgresProvider : DatabaseProviderBase
         };
         return new NpgsqlConnection(builder.ConnectionString);
     }
+
+    protected override string SqlLiteral(object? value) => value is byte[] bytes
+        ? "'\\x" + Convert.ToHexString(bytes) + "'::bytea"
+        : base.SqlLiteral(value);
 
     protected override void ConfigureParameter(DbParameter parameter, object? value)
     {

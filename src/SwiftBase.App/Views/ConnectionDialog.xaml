@@ -215,6 +215,18 @@
                                     <TextBlock Text="PASSWORD" Style="{StaticResource FormLabel}" />
                                     <PasswordBox x:Name="NewPasswordBox" PasswordChanged="PasswordBox_PasswordChanged" />
                                 </StackPanel>
+
+                                <StackPanel Margin="0,12,0,0">
+                                    <TextBlock Text="TLS TRUST" Style="{StaticResource SectionLabel}" Margin="0,0,0,7" />
+                                    <CheckBox Content="Allow unverified TLS (insecure — only for legacy self-signed servers)"
+                                              IsChecked="{Binding AllowUnverifiedTls, Mode=TwoWay}"
+                                              Foreground="#F3B4B4" FontSize="10.5" ToolTip="Disables server certificate and hostname verification. Only use on a trusted network." />
+                                    <TextBlock Text="TRUSTED CA FILE (OPTIONAL, PEM)" Style="{StaticResource FormLabel}" Margin="0,10,0,0" />
+                                    <TextBox Text="{Binding RootCertificatePath, UpdateSourceTrigger=PropertyChanged}"
+                                             ToolTip="PEM CA bundle used to verify the database server certificate" />
+                                    <TextBlock Text="Direct connections verify the server certificate and hostname by default. SSH-tunneled legs use the verified SSH host key."
+                                               Foreground="{StaticResource DimBrush}" FontSize="9.5" Margin="2,5,0,0" TextWrapping="Wrap" />
+                                </StackPanel>
                             </StackPanel>
                         </StackPanel>
                     </Border>
@@ -281,7 +293,10 @@
                                     <PasswordBox x:Name="SshPassphraseBox" PasswordChanged="SshPassphraseBox_PasswordChanged" />
                                 </StackPanel>
                             </Grid>
-                            <TextBlock Text="Provide the SSH password, a private key, or both. The tunnel forwards the database connection through the SSH server."
+                            <CheckBox Content="Trust this SSH host key on first use (verify its fingerprint out of band)"
+                                      IsChecked="{Binding TrustNewHostKey, Mode=TwoWay}"
+                                      Margin="0,11,0,0" FontSize="10.5" />
+                            <TextBlock Text="Provide the SSH password, a private key, or both. Unknown host keys are refused until you explicitly enable first-use trust; changed keys are always refused."
                                        Foreground="{StaticResource DimBrush}" FontSize="9.5" Margin="2,9,0,0" TextWrapping="Wrap" />
                         </StackPanel>
                     </Border>

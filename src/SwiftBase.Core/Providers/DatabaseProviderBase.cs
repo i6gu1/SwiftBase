@@ -436,7 +436,8 @@ public abstract class DatabaseProviderBase : IDatabaseProvider
                 }
 
                 // Let the database generate auto-increment / default primary keys.
-                if (primaryKeys.Contains(column) && string.IsNullOrEmpty(value))
+                // Typed values are now preserved, so do not coerce them to strings here.
+                if (primaryKeys.Contains(column) && (value is null or DBNull || (value is string text && text.Length == 0)))
                 {
                     continue;
                 }
@@ -566,6 +567,9 @@ public abstract class DatabaseProviderBase : IDatabaseProvider
         }
     }
 
+    /// <summary>Public entry point used by export generation. Always engine-correct.</summary>
+    public string FormatSqlLiteral(object? value) => SqlLiteral(value);
+
     protected virtual string SqlLiteral(object? value)
     {
         if (value is null or DBNull)
@@ -573,9 +577,42 @@ public abstract class DatabaseProviderBase : IDatabaseProvider
             return "NULL";
         }
 
-        var text = Convert.ToString(value, CultureInfo.InvariantCulture) ?? "";
-        return "'" + text.Replace("'", "''", StringComparison.Ordinal) + "'";
+        if (value is bool boolean)
+        {
+            return boolean ? "TRUE" : "FALSE";
+        }
+
+        if (value is byte[] bytes)
+        {
+            return "X'" + Convert.ToHexString(bytes) + "'";
+        }
+
+        if (value is DateTime dateTime)
+        {
+            return Quote(dateTime.ToString("O", CultureInfo.InvariantCulture));
+        }
+
+        if (value is DateTimeOffset dateTimeOffset)
+        {
+            return Quote(dateTimeOffset.ToString("O", CultureInfo.InvariantCulture));
+        }
+
+        if (value is Guid guid)
+        {
+            return Quote(guid.ToString("D"));
+        }
+
+        if (value is byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal)
+        {
+            return Invariant(value);
+        }
+
+        return Quote(Invariant(value));
     }
+
+    /// <summary>ANSI/SQLite/PostgreSQL string literal. MySQL overrides with backslash handling.</summary>
+    protected static string Quote(string text) =>
+        "'" + text.Replace("'", "''", StringComparison.Ordinal) + "'";
 
     protected static string Invariant(object? value) =>
         value is null or DBNull ? "" : Convert.ToString(value, CultureInfo.InvariantCulture) ?? "";

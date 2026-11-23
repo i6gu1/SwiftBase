@@ -48,18 +48,7 @@
                         <TextBlock Text="{Binding Database}" FontSize="9.5" Foreground="{StaticResource MutedBrush}" />
                     </Border>
                     <Border Background="#0E3024" CornerRadius="4" Padding="6,2" Margin="5,0,0,0" VerticalAlignment="Center">
-                        <TextBlock FontSize="8.5" FontWeight="Bold" Foreground="{StaticResource GreenBrush}">
-                            <TextBlock.Style>
-                                <Style TargetType="{x:Type TextBlock}">
-                                    <Setter Property="Text" Value="DEMO" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsLive}" Value="True">
-                                            <Setter Property="Text" Value="LIVE" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
+                        <TextBlock Text="LIVE" FontSize="8.5" FontWeight="Bold" Foreground="{StaticResource GreenBrush}" />
                     </Border>
                     <TextBlock Text="Ctrl + Enter runs the selection, or the whole script"
                                Foreground="{StaticResource DimBrush}" FontSize="10.5" Margin="14,0,0,0"

@@ -44,12 +44,15 @@ public enum ChangeKind
     Delete,
 }
 
-/// <summary>A single staged edit. Values and originals are raw text from the grid.</summary>
+/// <summary>
+/// A single staged edit. Values keep their original CLR type so BLOBs, timestamps
+/// and TIME values survive a save unchanged; the grid's text is display-only.
+/// </summary>
 public sealed class TableChange
 {
     public ChangeKind Kind { get; init; }
-    public Dictionary<string, string?> Values { get; init; } = new(StringComparer.OrdinalIgnoreCase);
-    public Dictionary<string, string?> OriginalValues { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, object?> Values { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, object?> OriginalValues { get; init; } = new(StringComparer.OrdinalIgnoreCase);
 }
 
 public sealed class TableChangeSet

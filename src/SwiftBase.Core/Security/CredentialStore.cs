@@ -23,6 +23,7 @@ public sealed class CredentialStore
 
     private readonly string _path;
     private bool _loadFailed;
+    private bool _decryptFailed;
 
     public CredentialStore(string? path = null)
     {
@@ -34,9 +35,13 @@ public sealed class CredentialStore
     /// <summary>True when the vault file exists but could not be read or parsed.</summary>
     public bool LastLoadFailed => _loadFailed;
 
+    /// <summary>True when at least one DPAPI-protected secret could not be decrypted.</summary>
+    public bool LastDecryptFailed => _decryptFailed;
+
     public IReadOnlyList<ConnectionConfig> Load()
     {
         _loadFailed = false;
+        _decryptFailed = false;
         if (!File.Exists(_path))
         {
             return Array.Empty<ConnectionConfig>();
@@ -61,16 +66,23 @@ public sealed class CredentialStore
 
     public void SaveAll(IEnumerable<ConnectionConfig> configs)
     {
-        if (_loadFailed)
+        if (_loadFailed || _decryptFailed)
         {
             throw new InvalidOperationException(
-                "Saved connections could not be read. Refusing to overwrite the vault.");
+                "Saved connections or their protected secrets could not be read. " +
+                "Refusing to overwrite the vault. Re-enter the affected credentials before saving.");
         }
 
-        var stored = configs
-            .Where(c => !c.IsDemo)
-            .Select(ToStored)
-            .ToList();
+        List<StoredConnection> stored;
+        try
+        {
+            stored = configs.Select(ToStored).ToList();
+        }
+        catch (CryptographicException ex)
+        {
+            throw new InvalidOperationException(
+                "Windows could not protect the connection secrets: " + ex.Message, ex);
+        }
 
         var directory = Path.GetDirectoryName(_path);
         if (string.IsNullOrEmpty(directory))
@@ -92,12 +104,16 @@ public sealed class CredentialStore
                 throw new InvalidOperationException("The generated vault file was empty.");
             }
 
-            if (File.Exists(_path))
-            {
-                File.Copy(_path, _path + ".bak", true);
-            }
-
             File.Move(temp, _path, true);
+
+            // The payload is verified before the atomic replace, so a persistent
+            // backup is unnecessary. Remove one left by an older build so stale
+            // protected secrets do not remain on disk indefinitely.
+            var staleBackup = _path + ".bak";
+            if (File.Exists(staleBackup))
+            {
+                File.Delete(staleBackup);
+            }
         }
         finally
         {
@@ -142,15 +158,18 @@ public sealed class CredentialStore
         Environment = config.Environment,
         Password = Protect(config.Password),
         UseSsh = config.UseSsh,
+        AllowUnverifiedTls = config.AllowUnverifiedTls,
+        RootCertificatePath = config.RootCertificatePath,
         SshHost = config.Ssh.Host,
         SshPort = config.Ssh.Port,
         SshUsername = config.Ssh.Username,
         SshPassword = Protect(config.Ssh.Password),
+        SshTrustNewHostKey = config.Ssh.TrustNewHostKey,
         SshPrivateKeyPath = config.Ssh.PrivateKeyPath,
         SshPassphrase = Protect(config.Ssh.Passphrase),
     };
 
-    private static ConnectionConfig ToConfig(StoredConnection stored) => new()
+    private ConnectionConfig ToConfig(StoredConnection stored) => new()
     {
         Id = stored.Id,
         Name = stored.Name,
@@ -160,9 +179,10 @@ public sealed class CredentialStore
         Database = stored.Database,
         Username = stored.Username,
         Environment = string.IsNullOrWhiteSpace(stored.Environment) ? "Local" : stored.Environment,
-        IsDemo = false,
         Password = Unprotect(stored.Password),
         UseSsh = stored.UseSsh,
+        AllowUnverifiedTls = stored.AllowUnverifiedTls,
+        RootCertificatePath = stored.RootCertificatePath,
         Ssh = new SshConfig
         {
             Host = stored.SshHost ?? "",
@@ -171,6 +191,7 @@ public sealed class CredentialStore
             Password = Unprotect(stored.SshPassword),
             PrivateKeyPath = stored.SshPrivateKeyPath,
             Passphrase = Unprotect(stored.SshPassphrase),
+            TrustNewHostKey = stored.SshTrustNewHostKey,
         },
     };
 
@@ -185,7 +206,7 @@ public sealed class CredentialStore
         return "dpapi:" + Convert.ToBase64String(bytes);
     }
 
-    private static string? Unprotect(string? value)
+    private string? Unprotect(string? value)
     {
         if (string.IsNullOrEmpty(value))
         {
@@ -196,6 +217,7 @@ public sealed class CredentialStore
         {
             if (!value.StartsWith("dpapi:", StringComparison.Ordinal))
             {
+                _decryptFailed = true;
                 return null;
             }
 
@@ -204,6 +226,9 @@ public sealed class CredentialStore
         }
         catch
         {
+            // A different Windows account, a migrated profile or corrupt ciphertext:
+            // keep the data on disk and block any save that would erase it.
+            _decryptFailed = true;
             return null;
         }
     }
@@ -220,6 +245,9 @@ public sealed class CredentialStore
         public string Environment { get; set; } = "Local";
         public string? Password { get; set; }
         public bool UseSsh { get; set; }
+        public bool AllowUnverifiedTls { get; set; }
+        public string? RootCertificatePath { get; set; }
+        public bool SshTrustNewHostKey { get; set; }
         public string? SshHost { get; set; }
         public int SshPort { get; set; }
         public string? SshUsername { get; set; }

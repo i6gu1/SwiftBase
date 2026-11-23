@@ -1,7 +1,5 @@
 using System.Collections.ObjectModel;
 using System.Data;
-using System.Diagnostics;
-using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Windows.Input;
@@ -16,7 +14,7 @@ public sealed record SqlCompletion(string Text, string Description);
 /// <summary>SQL console tab: editor, cancellation, results grid and exports.</summary>
 public sealed class QueryTabViewModel : TabViewModel
 {
-    private readonly DatabaseSession? _session;
+    private readonly DatabaseSession _session;
     private readonly IReadOnlyList<DbTable> _tables;
     private readonly string _database;
     private readonly int _number;
@@ -36,7 +34,7 @@ public sealed class QueryTabViewModel : TabViewModel
     private CancellationTokenSource? _cts;
 
     public QueryTabViewModel(
-        DatabaseSession? session,
+        DatabaseSession session,
         string database,
         IReadOnlyList<DbTable> tables,
         int number,
@@ -61,7 +59,6 @@ public sealed class QueryTabViewModel : TabViewModel
 
     public string Database => _database;
     public int Number => _number;
-    public bool IsLive => _session is not null;
     public override bool IsQueryTab => true;
 
     public string EditorText
@@ -185,15 +182,7 @@ public sealed class QueryTabViewModel : TabViewModel
 
         try
         {
-            QueryResult result;
-            if (_session is not null)
-            {
-                result = await _session.Provider.ExecuteAsync(sql, 5000, token);
-            }
-            else
-            {
-                result = await RunDemoAsync(sql, token);
-            }
+            var result = await _session.Provider.ExecuteAsync(sql, 5000, token);
 
             if (token.IsCancellationRequested)
             {
@@ -279,12 +268,15 @@ public sealed class QueryTabViewModel : TabViewModel
             return "";
         }
 
+        var provider = _session.Provider;
+        var table = provider.QuoteIdentifier("exported_rows");
+        var columns = string.Join(", ", _lastResult.Columns.Select(c => provider.QuoteIdentifier(c.Name)));
         var builder = new StringBuilder();
-        var columns = string.Join(", ", _lastResult.Columns.Select(c => "\"" + c.Name.Replace("\"", "\"\"", StringComparison.Ordinal) + "\""));
         foreach (var row in _lastResult.Rows)
         {
-            var values = string.Join(", ", row.Select(SqlLiteral));
-            builder.AppendLine($"INSERT INTO exported_rows ({columns}) VALUES ({values});");
+            // Typed values go through the engine provider, never through display text.
+            var values = string.Join(", ", row.Select(provider.FormatSqlLiteral));
+            builder.AppendLine($"INSERT INTO {table} ({columns}) VALUES ({values});");
         }
 
         return builder.ToString();
@@ -350,82 +342,6 @@ public sealed class QueryTabViewModel : TabViewModel
         }
     }
 
-    private async Task<QueryResult> RunDemoAsync(string sql, CancellationToken token)
-    {
-        var stopwatch = Stopwatch.StartNew();
-        await Task.Delay(120 + Random.Shared.Next(0, 90), token);
-
-        var trimmed = sql.Trim();
-        if (!trimmed.StartsWith("select", StringComparison.OrdinalIgnoreCase))
-        {
-            stopwatch.Stop();
-            return new QueryResult
-            {
-                ElapsedMs = stopwatch.ElapsedMilliseconds,
-                AffectedRows = 1,
-                Message = "Statement completed · 1 row affected (demo)",
-            };
-        }
-
-        var tableName = ExtractTableName(trimmed);
-        var source = _tables.FirstOrDefault(t =>
-            string.Equals(t.Name, tableName, StringComparison.OrdinalIgnoreCase)) ?? _tables.FirstOrDefault();
-
-        var result = new QueryResult();
-        if (source is null)
-        {
-            result.Columns.Add(new QueryColumn { Name = "answer", DataType = "int4" });
-            result.Rows.Add(new object?[] { 42 });
-        }
-        else
-        {
-            result.Columns.AddRange(source.Columns.Select(c => new QueryColumn
-            {
-                Name = c.Name,
-                DataType = c.DataType,
-            }));
-
-            foreach (var row in source.Rows.Take(500))
-            {
-                result.Rows.Add(row.OrderedCells.Select(cell => (object?)(cell.IsNull ? null : cell.Value)).ToArray());
-            }
-
-            result.Truncated = source.Rows.Count > 500;
-        }
-
-        stopwatch.Stop();
-        result.ElapsedMs = stopwatch.ElapsedMilliseconds;
-        result.Message = result.Truncated
-            ? $"Showing the first 500 rows (demo) · {stopwatch.ElapsedMilliseconds} ms"
-            : $"{result.Rows.Count:N0} rows returned (demo) · {stopwatch.ElapsedMilliseconds} ms";
-        return result;
-    }
-
-    private static string? ExtractTableName(string sql)
-    {
-        var index = sql.IndexOf("from", StringComparison.OrdinalIgnoreCase);
-        if (index < 0)
-        {
-            return null;
-        }
-
-        var rest = sql[(index + 4)..].TrimStart();
-        if (rest.StartsWith('"') || rest.StartsWith('`') || rest.StartsWith('['))
-        {
-            rest = rest[1..];
-        }
-
-        var end = 0;
-        while (end < rest.Length && (char.IsLetterOrDigit(rest[end]) || rest[end] is '_' or '.'))
-        {
-            end++;
-        }
-
-        var name = rest[..end];
-        var dot = name.LastIndexOf('.');
-        return dot >= 0 ? name[(dot + 1)..] : name;
-    }
-
     private IReadOnlyList<SqlCompletion> BuildCompletions()
     {
         var words = new List<SqlCompletion>();
@@ -456,33 +372,20 @@ public sealed class QueryTabViewModel : TabViewModel
 
     private static string EscapeCsv(string value)
     {
-        if (value.Contains('"') || value.Contains(',') || value.Contains('\n') || value.Contains('\r'))
+        // Spreadsheet apps execute cells beginning with these characters.
+        // A leading apostrophe forces text without changing the exported value
+        // when the file is read as plain text.
+        var first = value.TrimStart().FirstOrDefault();
+        var safe = first is '=' or '+' or '-' or '@' or '\t' or '\r'
+            ? "'" + value
+            : value;
+
+        if (safe.Contains('"') || safe.Contains(',') || safe.Contains('\n') || safe.Contains('\r'))
         {
-            return "\"" + value.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";
+            return "\"" + safe.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";
         }
 
-        return value;
-    }
-
-    private static string SqlLiteral(object? value)
-    {
-        if (value is null or DBNull)
-        {
-            return "NULL";
-        }
-
-        if (value is bool boolean)
-        {
-            return boolean ? "TRUE" : "FALSE";
-        }
-
-        if (value is int or long or short or byte or decimal or double or float)
-        {
-            return Convert.ToString(value, CultureInfo.InvariantCulture) ?? "0";
-        }
-
-        var text = ValueFormatter.FormatExport(value) ?? "";
-        return "'" + text.Replace("'", "''", StringComparison.Ordinal) + "'";
+        return safe;
     }
 
     public override void OnClosed()

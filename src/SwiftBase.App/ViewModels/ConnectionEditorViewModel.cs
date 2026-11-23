@@ -22,6 +22,9 @@ public sealed class ConnectionEditorViewModel : ObservableObject
     private string _sshPassword = "";
     private string _sshKeyPath = "";
     private string _sshPassphrase = "";
+    private bool _allowUnverifiedTls;
+    private string _rootCertificatePath = "";
+    private bool _trustNewHostKey;
     private string _urlText = "";
     private string _importStatus = "";
     private bool _importSucceeded;
@@ -162,6 +165,26 @@ public sealed class ConnectionEditorViewModel : ObservableObject
         set => Set(ref _sshPassphrase, value);
     }
 
+    /// <summary>Explicit, dangerous opt-in for self-signed database certificates.</summary>
+    public bool AllowUnverifiedTls
+    {
+        get => _allowUnverifiedTls;
+        set => Set(ref _allowUnverifiedTls, value);
+    }
+
+    public string RootCertificatePath
+    {
+        get => _rootCertificatePath;
+        set => Set(ref _rootCertificatePath, value);
+    }
+
+    /// <summary>Explicit opt-in to remember an SSH host key on first use.</summary>
+    public bool TrustNewHostKey
+    {
+        get => _trustNewHostKey;
+        set => Set(ref _trustNewHostKey, value);
+    }
+
     public string UrlText
     {
         get => _urlText;
@@ -300,7 +323,9 @@ public sealed class ConnectionEditorViewModel : ObservableObject
             }
 
             Name = string.IsNullOrWhiteSpace(Name) ? Database : Name;
-            SetImport($"{EngineName} URL imported.", true);
+            // The plaintext password must not stay visible in the URL box.
+            UrlText = RedactConnectionUrl(raw);
+            SetImport($"{EngineName} URL imported · password hidden.", true);
         }
         catch (Exception ex)
         {
@@ -344,6 +369,18 @@ public sealed class ConnectionEditorViewModel : ObservableObject
                 ValidationMessage = "Username is required.";
                 return false;
             }
+        }
+
+        if (AllowUnverifiedTls && !string.IsNullOrWhiteSpace(RootCertificatePath))
+        {
+            ValidationMessage = "Use either a trusted CA file or unverified TLS, not both.";
+            return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(RootCertificatePath) && !File.Exists(RootCertificatePath.Trim()))
+        {
+            ValidationMessage = "The root certificate file does not exist.";
+            return false;
         }
 
         if (UseSsh && IsServerBased)
@@ -390,6 +427,10 @@ public sealed class ConnectionEditorViewModel : ObservableObject
             Password = Password,
             Environment = Environment,
             UseSsh = UseSsh && IsServerBased,
+            AllowUnverifiedTls = IsServerBased && AllowUnverifiedTls,
+            RootCertificatePath = IsServerBased && !string.IsNullOrWhiteSpace(RootCertificatePath)
+                ? RootCertificatePath.Trim()
+                : null,
             Ssh = new SshConfig
             {
                 Host = SshHost.Trim(),
@@ -398,6 +439,7 @@ public sealed class ConnectionEditorViewModel : ObservableObject
                 Password = SshPassword,
                 PrivateKeyPath = string.IsNullOrWhiteSpace(SshKeyPath) ? null : SshKeyPath.Trim(),
                 Passphrase = SshPassphrase,
+                TrustNewHostKey = TrustNewHostKey,
             },
         };
     }
@@ -446,6 +488,41 @@ public sealed class ConnectionEditorViewModel : ObservableObject
 
             IsTesting = false;
         }
+    }
+
+    private static string RedactConnectionUrl(string url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || string.IsNullOrEmpty(uri.UserInfo))
+        {
+            return url;
+        }
+
+        var schemeEnd = url.IndexOf("//", StringComparison.Ordinal);
+        if (schemeEnd < 0)
+        {
+            return url;
+        }
+
+        var authorityStart = schemeEnd + 2;
+        var authorityEnd = url.IndexOfAny(new[] { '/', '?', '#' }, authorityStart);
+        var authority = authorityEnd < 0 ? url[authorityStart..] : url[authorityStart..authorityEnd];
+        var at = authority.LastIndexOf('@');
+        if (at < 0)
+        {
+            return url;
+        }
+
+        var userInfo = authority[..at];
+        var colon = userInfo.IndexOf(':');
+        var redacted = colon < 0
+            ? userInfo
+            : string.Concat(userInfo.AsSpan(0, colon + 1), "***");
+
+        return string.Concat(
+            url.AsSpan(0, authorityStart),
+            redacted.AsSpan(),
+            authority.AsSpan(at),
+            authorityEnd < 0 ? "" : url.AsSpan(authorityEnd));
     }
 
     private void SetImport(string message, bool success)

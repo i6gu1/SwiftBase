@@ -63,39 +63,24 @@ public sealed class SshTunnelManager : IDisposable
             client = new SshClient(connectionInfo);
             client.HostKeyReceived += (_, args) =>
             {
-                var fingerprint = args.FingerPrintSHA256 ?? "";
-                var verification = hostKeys.Verify(host, port, fingerprint);
+                // Bind the fingerprint to the algorithm as well, so a key-type
+                // downgrade cannot reuse a previously accepted SHA256 value.
+                var fingerprint = $"{args.HostKeyName}:{args.FingerPrintSHA256}";
+                var verification = hostKeys.VerifyOrTrust(
+                    host,
+                    port,
+                    fingerprint,
+                    config.TrustNewHostKey,
+                    out var failure);
+
                 if (verification == SshHostKeyVerification.Trusted)
                 {
                     args.CanTrust = true;
                     return;
                 }
 
-                if (verification == SshHostKeyVerification.Mismatch)
-                {
-                    hostKeyFailure = $"SSH host key changed for {host}:{port}. Refusing to connect.";
-                    args.CanTrust = false;
-                    return;
-                }
-
-                if (verification == SshHostKeyVerification.LoadFailed)
-                {
-                    hostKeyFailure = "SSH known-hosts file could not be read. Refusing to connect.";
-                    args.CanTrust = false;
-                    return;
-                }
-
-                try
-                {
-                    // Trust on first use; every later connection must match.
-                    hostKeys.Trust(host, port, fingerprint);
-                    args.CanTrust = true;
-                }
-                catch (Exception ex)
-                {
-                    hostKeyFailure = "SSH host key could not be verified: " + ex.Message;
-                    args.CanTrust = false;
-                }
+                args.CanTrust = false;
+                hostKeyFailure = failure ?? "SSH host key could not be verified. Refusing to connect.";
             };
             client.KeepAliveInterval = TimeSpan.FromSeconds(30);
 
@@ -129,6 +114,11 @@ public sealed class SshTunnelManager : IDisposable
             catch
             {
                 client?.Dispose();
+                if (hostKeyFailure is not null)
+                {
+                    throw new InvalidOperationException(hostKeyFailure);
+                }
+
                 throw;
             }
         }, cancellationToken).ConfigureAwait(false);

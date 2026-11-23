@@ -1,4 +1,5 @@
 using System.Data.Common;
+using System.Globalization;
 using MySqlConnector;
 using SwiftBase.Core.Models;
 
@@ -28,6 +29,11 @@ public sealed class MySqlProvider : DatabaseProviderBase
 
     protected override DbConnection CreateConnection()
     {
+        // Direct connections verify both the CA and the hostname. The SSH tunnel
+        // case is authenticated by its verified host key and terminates on loopback.
+        var viaTunnel = Config.UseSsh && Config.Engine != DatabaseEngine.Sqlite;
+        var verifyCertificate = !Config.AllowUnverifiedTls && !viaTunnel;
+
         var builder = new MySqlConnectionStringBuilder
         {
             Server = string.IsNullOrWhiteSpace(Config.Host) ? "127.0.0.1" : Config.Host,
@@ -35,11 +41,16 @@ public sealed class MySqlProvider : DatabaseProviderBase
             Database = Config.Database,
             UserID = Config.Username,
             Password = Config.Password ?? "",
-            SslMode = MySqlSslMode.Required,
+            SslMode = viaTunnel
+                ? MySqlSslMode.Disabled
+                : verifyCertificate ? MySqlSslMode.VerifyFull : MySqlSslMode.Required,
+            SslCa = verifyCertificate && !string.IsNullOrWhiteSpace(Config.RootCertificatePath)
+                ? Config.RootCertificatePath
+                : null,
+            SkipCertificateRevocationCheck = false,
             ConnectionTimeout = 15,
             DefaultCommandTimeout = 120,
             AllowUserVariables = true,
-            CharacterSet = "utf8mb4",
             ApplicationName = "SwiftBase",
             Pooling = true,
         };
@@ -53,12 +64,34 @@ public sealed class MySqlProvider : DatabaseProviderBase
             return "NULL";
         }
 
+        if (value is bool boolean)
+        {
+            return boolean ? "TRUE" : "FALSE";
+        }
+
+        if (value is byte[] bytes)
+        {
+            return "X'" + Convert.ToHexString(bytes) + "'";
+        }
+
+        if (value is byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal)
+        {
+            return Invariant(value);
+        }
+
+        // Round-trip temporal values instead of using the display format.
+        var text = value switch
+        {
+            DateTime dateTime => dateTime.ToString("O", CultureInfo.InvariantCulture),
+            DateTimeOffset dateTimeOffset => dateTimeOffset.ToString("O", CultureInfo.InvariantCulture),
+            _ => Invariant(value),
+        };
+
         // MySQL treats backslashes as escapes in string literals, so they must
         // be doubled before the quote is escaped.
-        var text = Invariant(value)
+        return "'" + text
             .Replace("\\", "\\\\", StringComparison.Ordinal)
-            .Replace("'", "''", StringComparison.Ordinal);
-        return "'" + text + "'";
+            .Replace("'", "''", StringComparison.Ordinal) + "'";
     }
 
     protected override async Task<IReadOnlyList<string>> LoadDatabasesAsync(DbConnection connection, CancellationToken cancellationToken)

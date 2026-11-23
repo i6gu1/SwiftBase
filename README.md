@@ -1,6 +1,6 @@
 # SwiftBase
 
-SwiftBase is a keyboard-first, dark-mode database workbench built with WPF and .NET 10. It ships with a live demo workspace so the UI can be explored without a database server.
+SwiftBase is a keyboard-first, dark-mode database workbench built with WPF and .NET 10. It connects only to databases you configure; no demo profiles, sample catalogs or default credentials are shipped.
 
 ## Highlights
 
@@ -12,7 +12,7 @@ SwiftBase is a keyboard-first, dark-mode database workbench built with WPF and .
 - SQL console with selection execution, autocomplete and cancellation
 - CSV / JSON / INSERT export for query results
 - Command palette (`Ctrl+P`), connection switcher (`Ctrl+K`) and connection URL import
-- DPAPI-protected secrets, TLS-required server connections and SSH tunnels with trust-on-first-use host keys
+- DPAPI-protected secrets, authenticated TLS for direct server connections, and fail-closed SSH host keys with explicit first-use trust
 
 ## Projects
 
@@ -78,10 +78,9 @@ SwiftBase stores non-secret connection metadata and DPAPI-protected secrets unde
 %APPDATA%\SwiftBase\
 ```
 
-- `connections.json` — saved connections; secrets are DPAPI-encrypted for the current Windows account
-- `connections.json.bak` — backup written before each vault save
-- `ssh_known_hosts.json` — SSH host-key fingerprints; a changed fingerprint fails closed
+- `connections.json` — saved connections; secrets are DPAPI-encrypted for the current Windows account. The vault is never overwritten after a load/decrypt failure.
+- `ssh_known_hosts.json` — SSH host-key fingerprints; unknown keys require explicit first-use trust and changed keys fail closed
 - `queries.json` — saved query history
-- `crash.log` — unhandled exception diagnostics
+- `crash.log` — sanitized, user-ACL-restricted crash diagnostics, rotated at 256 KB. The old `connections.json.bak` file is removed on the next save.
 
-Demo connections and the 2,000-row sample catalog are generated in memory and are never written to the vault.
+No default/demo data is generated or written to disk.

@@ -25,7 +25,6 @@ public sealed class ConnectionProfile
     public string Host { get; init; } = "";
     public string Database { get; init; } = "";
     public string Environment { get; init; } = "Local";
-    public bool IsDemo { get; init; }
     public ConnectionConfig? Config { get; init; }
 
     public string Badge => Engine switch
@@ -63,7 +62,7 @@ public sealed class ConnectionProfile
         _ => "SQLite",
     };
 
-    public string GroupName => Environment == "Production" ? "Production" : IsDemo ? "Demo" : "Saved connections";
+    public string GroupName => Environment == "Production" ? "Production" : "Saved connections";
 
     public static ConnectionProfile FromConfig(ConnectionConfig config)
     {
@@ -88,7 +87,6 @@ public sealed class ConnectionProfile
                 ? System.IO.Path.GetFileName(config.Database)
                 : config.Database,
             Environment = config.Environment,
-            IsDemo = config.IsDemo,
             Config = config,
         };
     }
@@ -114,7 +112,6 @@ public sealed class ConnectionProfile
             Engine = engine,
             Database = profile.Database,
             Environment = profile.Environment,
-            IsDemo = profile.IsDemo,
         };
     }
 }
@@ -145,8 +142,6 @@ public sealed class DbTable
     public string Schema { get; init; } = "public";
     public string Database { get; init; } = "";
     public IReadOnlyList<DbColumn> Columns { get; init; } = Array.Empty<DbColumn>();
-    public ObservableCollection<RowViewModel> Rows { get; } = new();
-    public bool IsLive { get; init; }
     public TableRef? TableRef { get; init; }
 
     public string Glyph => Kind switch
@@ -183,7 +178,6 @@ public sealed class DbTable
             Name = info.Name,
             Schema = info.Schema,
             Kind = kind,
-            IsLive = true,
             TableRef = new TableRef(info.Schema, info.Name),
             Columns = info.Columns.Select(c => new DbColumn
             {

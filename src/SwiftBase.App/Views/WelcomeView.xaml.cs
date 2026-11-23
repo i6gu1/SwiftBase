@@ -35,22 +35,13 @@ public partial class WelcomeView : UserControl
     {
         if (ViewModel is not null && ResolveProfile(sender) is { } profile)
         {
-            ViewModel.DeleteConnection(profile);
+            _ = ViewModel.DeleteConnectionAsync(profile);
         }
     }
 
     private void NewConnection_Click(object sender, RoutedEventArgs e) => ViewModel?.RequestConnectionDialog();
 
     private void OpenSqlite_Click(object sender, RoutedEventArgs e) => ViewModel?.RequestOpenSqliteFile();
-
-    private void Demo_Click(object sender, RoutedEventArgs e)
-    {
-        var demo = ViewModel?.AllConnections.FirstOrDefault(profile => profile.IsDemo);
-        if (demo is not null)
-        {
-            _ = ViewModel!.ConnectAsync(demo);
-        }
-    }
 
     private static ConnectionProfile? ResolveProfile(object sender)
     {
